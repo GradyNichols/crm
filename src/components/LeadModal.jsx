@@ -1,0 +1,259 @@
+import { useState, useEffect } from "react";
+import { STATUSES, OUTREACH_TYPES } from "../constants";
+
+const EMPTY_FORM = {
+  businessName: "",
+  ownerName: "",
+  phone: "",
+  email: "",
+  address: "",
+  type: "Phone Call",
+  strength: 3,
+  status: "Cold",
+  lastTouchDate: "",
+  followUpDate: "",
+  notes: "",
+};
+
+export default function LeadModal({ onClose, onSave, existing }) {
+  const [form, setForm] = useState(
+    existing ? { ...existing } : { ...EMPTY_FORM },
+  );
+  const [errors, setErrors] = useState({});
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const set = (key, val) => {
+    setForm((f) => ({ ...f, [key]: val }));
+    setErrors((e) => ({ ...e, [key]: undefined }));
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.businessName.trim()) e.businessName = "Required";
+    if (!form.phone.trim() && !form.email.trim())
+      e.phone = "Phone or email required";
+    if (!form.status) e.status = "Required";
+    return e;
+  };
+
+  const handleSubmit = () => {
+    const e = validate();
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
+    onSave(form);
+    setSaved(true);
+    setTimeout(() => {
+      setSaved(false);
+      if (!existing) setForm({ ...EMPTY_FORM });
+      onClose();
+    }, 700);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm pt-8 px-4 pb-8 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-xl bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <h2 className="text-base font-semibold text-slate-100">
+            {existing ? "Edit Lead" : "Add Lead"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-300 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          {/* Business Name */}
+          <Field label="Business Name" required error={errors.businessName}>
+            <input
+              autoFocus
+              value={form.businessName}
+              onChange={(e) => set("businessName", e.target.value)}
+              placeholder="e.g. El Maizal"
+              className={inputClass(errors.businessName)}
+            />
+          </Field>
+
+          {/* Owner */}
+          <Field label="Owner Name">
+            <input
+              value={form.ownerName}
+              onChange={(e) => set("ownerName", e.target.value)}
+              placeholder="Optional"
+              className={inputClass()}
+            />
+          </Field>
+
+          {/* Contact row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Phone" error={errors.phone}>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                placeholder="(805) 555-0000"
+                className={inputClass(errors.phone)}
+              />
+            </Field>
+            <Field label="Email">
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => set("email", e.target.value)}
+                placeholder="owner@restaurant.com"
+                className={inputClass()}
+              />
+            </Field>
+          </div>
+
+          {/* Address */}
+          <Field label="Address">
+            <input
+              value={form.address}
+              onChange={(e) => set("address", e.target.value)}
+              placeholder="123 Main St, Simi Valley"
+              className={inputClass()}
+            />
+          </Field>
+
+          {/* Type + Status row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Outreach Type">
+              <select
+                value={form.type}
+                onChange={(e) => set("type", e.target.value)}
+                className={inputClass()}
+              >
+                {OUTREACH_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Status" required error={errors.status}>
+              <select
+                value={form.status}
+                onChange={(e) => set("status", e.target.value)}
+                className={inputClass(errors.status)}
+              >
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {/* Strength */}
+          <Field
+            label={`Strength: ${["", "★☆☆☆☆", "★★☆☆☆", "★★★☆☆", "★★★★☆", "★★★★★"][form.strength]}`}
+          >
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={form.strength}
+              onChange={(e) => set("strength", Number(e.target.value))}
+              className="w-full accent-blue-500 cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-slate-600 mt-0.5">
+              <span>Unlikely</span>
+              <span>Almost certain</span>
+            </div>
+          </Field>
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Last Touch Date">
+              <input
+                type="date"
+                value={form.lastTouchDate}
+                onChange={(e) => set("lastTouchDate", e.target.value)}
+                className={inputClass()}
+              />
+            </Field>
+            <Field label="Follow-up Date">
+              <input
+                type="date"
+                value={form.followUpDate}
+                onChange={(e) => set("followUpDate", e.target.value)}
+                className={inputClass()}
+              />
+            </Field>
+          </div>
+
+          {/* Notes */}
+          <Field label="Notes">
+            <textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Anything worth remembering..."
+              className={`${inputClass()} resize-none`}
+            />
+          </Field>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800">
+          <button
+            onClick={onClose}
+            className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
+              saved
+                ? "bg-green-600 text-white"
+                : "bg-blue-600 hover:bg-blue-500 text-white"
+            }`}
+          >
+            {saved ? "✓ Saved" : existing ? "Save Changes" : "Add Lead"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, required, error, children }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+        {label}
+        {required && <span className="text-blue-500 ml-0.5">*</span>}
+      </label>
+      {children}
+      {error && <p className="text-xs text-red-400">{error}</p>}
+    </div>
+  );
+}
+
+function inputClass(error) {
+  return `w-full bg-slate-800/60 border ${
+    error ? "border-red-500" : "border-slate-700"
+  } text-slate-100 text-sm rounded-lg px-3 py-2 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors`;
+}

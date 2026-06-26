@@ -1,16 +1,63 @@
-import { useState } from "react";
-import { Routes, Route, NavLink, useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import {
+  Routes,
+  Route,
+  NavLink,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import useCRMStore from "./store/useCRMStore";
 import SummaryBar from "./components/SummaryBar";
 import LeadTable from "./components/LeadTable";
 import LeadModal from "./components/LeadModal";
 import Settings from "./pages/Settings";
+import Search from "./pages/Search";
+
+// ── Icons ──────────────────────────────────────────────────────────────────────
+
+function HamburgerIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-6 h-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-6 h-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+      />
+    </svg>
+  );
+}
 
 function SettingsIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      className="w-5 h-5"
+      className="w-6 h-6"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -30,22 +77,155 @@ function SettingsIcon() {
   );
 }
 
+// ── Sidebar ────────────────────────────────────────────────────────────────────
+
+function Sidebar({ open, onClose }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const panelRef = useRef(null);
+  const onSearch = location.pathname === "/search";
+  const onSettings = location.pathname === "/settings";
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open, onClose]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  // Lock scroll while open
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  const go = (path) => {
+    navigate(path);
+    onClose();
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${
+          open
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+      />
+
+      {/* Drawer panel */}
+      <div
+        ref={panelRef}
+        className={`fixed top-0 left-0 h-full z-50 w-64 bg-[#080d14] border-r border-slate-800 flex flex-col transition-transform duration-200 ease-in-out ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Panel header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-widest">
+            Menu
+          </span>
+          <button
+            onClick={onClose}
+            className="text-slate-600 hover:text-slate-300 transition-colors text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Mobile-only nav items */}
+        <nav className="flex-1 px-3 py-4 space-y-1 sm:hidden">
+          <SidebarNavItem
+            label="Search"
+            icon={<SearchIcon />}
+            active={onSearch}
+            onClick={() => go("/search")}
+          />
+          <SidebarNavItem
+            label="Settings"
+            icon={<SettingsIcon />}
+            active={onSettings}
+            onClick={() => go("/settings")}
+          />
+        </nav>
+
+        {/* Desktop: empty body — future items go here */}
+        <div className="flex-1 hidden sm:block" />
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-slate-800">
+          <p className="text-xs text-slate-700">Restaurant CRM</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SidebarNavItem({ label, icon, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-left ${
+        active
+          ? "bg-blue-950/60 text-blue-300"
+          : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+
 function Dashboard({ onEditLead }) {
   const { leads } = useCRMStore();
+  const [statusFilter, setStatusFilter] = useState(null);
+  const filteredLeads = statusFilter
+    ? leads.filter((l) => l.status === statusFilter)
+    : leads;
+
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      <SummaryBar leads={leads} />
-      <LeadTable leads={leads} onEdit={onEditLead} />
+      <SummaryBar
+        leads={leads}
+        statusFilter={statusFilter}
+        onStatusClick={(s) => setStatusFilter((p) => (p === s ? null : s))}
+      />
+      <LeadTable leads={filteredLeads} onEdit={onEditLead} />
     </main>
   );
 }
+
+// ── App ────────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const { addLead, updateLead } = useCRMStore();
   const [showModal, setShowModal] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const onSettings = location.pathname === "/settings";
+  const onSearch = location.pathname === "/search";
 
   const handleSave = (form) => {
     if (editingLead) updateLead(editingLead.id, form);
@@ -56,70 +236,114 @@ export default function App() {
     setEditingLead(lead);
     setShowModal(true);
   };
-
   const handleClose = () => {
     setShowModal(false);
     setEditingLead(null);
   };
+  const handleSearchClick = () => navigate(onSearch ? "/" : "/search");
+  const handleSettingsClick = () => navigate(onSettings ? "/" : "/settings");
 
   const now = new Date();
   const lastUpdated = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 
   return (
     <div className="min-h-screen bg-[#03060f] text-slate-100">
-      {/* Header */}
-      <header className="border-b border-slate-800 bg-[#03060f]/90 sticky top-0 z-40 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div>
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <header className="border-b border-slate-800 bg-[#03060f]/90 sticky top-0 z-30 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+          {/* Hamburger — left of title on desktop, hidden on mobile (moved to right) */}
+          <button
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="hidden sm:flex p-2.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors shrink-0"
+            title="Menu"
+          >
+            <HamburgerIcon />
+          </button>
+
+          {/* Title */}
+          <div className="flex-1 px-2">
             <NavLink to="/">
               <h1 className="text-xl font-semibold text-slate-100 tracking-tight hover:text-blue-400 transition-colors">
-                Restaurant CRM
+                CRM Dashboard
               </h1>
             </NavLink>
-            <p className="text-sm text-slate-600 mt-0.5">
+            <p className="text-sm text-slate-600 mt-0.5 hidden sm:block">
               Last updated {lastUpdated}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Settings icon */}
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                `p-2 rounded-lg transition-colors ${
-                  isActive
-                    ? "text-blue-400 bg-blue-950/50"
-                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
-                }`
-              }
-              title="Settings"
+          {/* Right side */}
+          <div className="flex items-center gap-2">
+            {/* Search + Settings — desktop only */}
+            <button
+              onClick={handleSearchClick}
+              className={`hidden sm:flex p-2.5 rounded-lg transition-colors ${
+                onSearch
+                  ? "text-blue-400 bg-blue-950/50"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+              }`}
+              title={onSearch ? "Back to dashboard" : "Search leads"}
+            >
+              <SearchIcon />
+            </button>
+
+            <button
+              onClick={handleSettingsClick}
+              className={`mr-1 hidden sm:flex p-2.5 rounded-lg transition-colors ${
+                onSettings
+                  ? "text-blue-400 bg-blue-950/50"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+              }`}
+              title={onSettings ? "Back to dashboard" : "Settings"}
             >
               <SettingsIcon />
-            </NavLink>
+            </button>
 
-            {/* Add Lead — hidden on settings page */}
-            {!onSettings && (
+            {/* Add Lead — desktop only on non-settings/search pages */}
+            {!onSettings && !onSearch && (
               <button
                 onClick={() => {
                   setEditingLead(null);
                   setShowModal(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-500 text-white text-base font-medium px-5 py-2.5 rounded-lg transition-colors"
+                className="hidden sm:flex bg-blue-600 hover:bg-blue-500 text-white text-base font-medium px-5 py-2.5 rounded-lg transition-colors"
               >
                 + Add Lead
               </button>
             )}
+
+            {/* Mobile: Add Lead (dashboard only) */}
+            {!onSettings && !onSearch && (
+              <button
+                onClick={() => {
+                  setEditingLead(null);
+                  setShowModal(true);
+                }}
+                className="sm:hidden bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                + Add Lead
+              </button>
+            )}
+
+            {/* Hamburger — mobile only, right side */}
+            <button
+              onClick={() => setSidebarOpen((o) => !o)}
+              className="sm:hidden p-2.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+              title="Menu"
+            >
+              <HamburgerIcon />
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Routes */}
       <Routes>
         <Route path="/" element={<Dashboard onEditLead={handleEdit} />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/search" element={<Search />} />
       </Routes>
 
-      {/* Lead modal */}
       {showModal && (
         <LeadModal
           onClose={handleClose}

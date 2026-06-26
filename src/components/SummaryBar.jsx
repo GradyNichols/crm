@@ -7,7 +7,7 @@ import {
 } from "date-fns";
 import { STATUS_COLORS } from "../constants";
 
-export default function SummaryBar({ leads }) {
+export default function SummaryBar({ leads, statusFilter, onStatusClick }) {
   const today = startOfToday();
   const weekEnd = addDays(today, 7);
 
@@ -50,16 +50,32 @@ export default function SummaryBar({ leads }) {
         />
       </div>
 
-      {/* Status breakdown */}
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(statusCounts).map(([status, count]) => (
-          <span
-            key={status}
-            className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[status] || "bg-slate-700 text-slate-200"}`}
+      {/* Status breakdown — filterable buttons */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {Object.entries(statusCounts).map(([status, count]) => {
+          const isActive = statusFilter === status;
+          return (
+            <button
+              key={status}
+              onClick={() => onStatusClick(status)}
+              className={`text-xs font-medium px-2.5 py-1 rounded-full transition-all border ${
+                isActive
+                  ? `${STATUS_COLORS[status] || "bg-slate-700 text-slate-200"} border-white/30 ring-1 ring-white/20 scale-105`
+                  : `${STATUS_COLORS[status] || "bg-slate-700 text-slate-200"} border-transparent opacity-60 hover:opacity-100`
+              }`}
+            >
+              {count} {status}
+            </button>
+          );
+        })}
+        {statusFilter && (
+          <button
+            onClick={() => onStatusClick(statusFilter)}
+            className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 transition-colors"
           >
-            {count} {status}
-          </span>
-        ))}
+            Clear ×
+          </button>
+        )}
       </div>
 
       {/* Upcoming follow-ups */}

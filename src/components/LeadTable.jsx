@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { COLUMNS, STATUS_COLORS } from "../constants";
 import { ICONS } from "../icons";
 import useCRMStore from "../store/useCRMStore";
@@ -28,7 +28,24 @@ function TypeBadge({ type }) {
   );
 }
 
-// Custom delete confirmation modal
+// Render a custom column cell value based on its type
+function CustomCell({ col, value }) {
+  if (value === undefined || value === null || value === "") {
+    return <span className="text-slate-700">—</span>;
+  }
+  if (col.type === "checkbox") {
+    return (
+      <span className={value ? "text-green-400" : "text-slate-600"}>
+        {value ? "✓ Yes" : "✗ No"}
+      </span>
+    );
+  }
+  if (col.type === "stars") {
+    return <StarRating value={Number(value)} />;
+  }
+  return <span className="text-slate-300">{String(value)}</span>;
+}
+
 function DeleteConfirmModal({ lead, onConfirm, onCancel }) {
   return (
     <div
@@ -85,10 +102,18 @@ function DeleteConfirmModal({ lead, onConfirm, onCancel }) {
 }
 
 export default function LeadTable({ leads, onEdit }) {
-  const { sortKey, sortDir, setSort } = useCRMStore();
+  const sortKey = useCRMStore((s) => s.sortKey);
+  const sortDir = useCRMStore((s) => s.sortDir);
+  const setSort = useCRMStore((s) => s.setSort);
+  const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const deleteLead = useCRMStore((s) => s.deleteLead);
   const [expandedId, setExpandedId] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null); // lead to confirm deletion
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const allColumns = [
+    ...COLUMNS,
+    ...customColumns.map((c) => ({ key: c.id, label: c.label, custom: true })),
+  ];
 
   const sorted = [...leads].sort((a, b) => {
     const av = a[sortKey] ?? "";
@@ -100,11 +125,44 @@ export default function LeadTable({ leads, onEdit }) {
 
   const SortIcon = ({ col }) => {
     if (sortKey !== col)
-      return <span className="text-slate-700 ml-1 text-xs">↕</span>;
-    return (
-      <span className="text-blue-400 ml-1 text-xs">
-        {sortDir === "asc" ? "↑" : "↓"}
-      </span>
+      return (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-3 h-3 inline-block ml-1 mb-0.5 text-slate-700"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 9l4-4 4 4M16 15l-4 4-4-4"
+          />
+        </svg>
+      );
+    return sortDir === "asc" ? (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-3 h-3 inline-block ml-1 mb-0.5 text-blue-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 15l4-4 4 4" />
+      </svg>
+    ) : (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-3 h-3 inline-block ml-1 mb-0.5 text-blue-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 9l-4 4-4-4" />
+      </svg>
     );
   };
 
@@ -116,13 +174,13 @@ export default function LeadTable({ leads, onEdit }) {
           <table className="w-full text-base">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/80">
-                {COLUMNS.map((col) => (
+                {allColumns.map((col) => (
                   <th
                     key={col.key}
                     onClick={() => setSort(col.key)}
                     className="text-left px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-300 select-none whitespace-nowrap"
                   >
-                    {ICONS[col.icon] ?? null}
+                    {col.icon ? ICONS[col.icon] : null}
                     {col.label}
                     <SortIcon col={col.key} />
                   </th>
@@ -134,9 +192,8 @@ export default function LeadTable({ leads, onEdit }) {
             </thead>
             <tbody>
               {sorted.map((lead, i) => (
-                <>
+                <React.Fragment key={lead.id}>
                   <tr
-                    key={lead.id}
                     onClick={() =>
                       setExpandedId(expandedId === lead.id ? null : lead.id)
                     }
@@ -152,13 +209,13 @@ export default function LeadTable({ leads, onEdit }) {
                         <span className="text-slate-700">—</span>
                       )}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <TypeBadge type={lead.type} />
                     </td>
                     <td className="px-5 py-4">
                       <StarRating value={lead.strength} />
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <span
                         className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COLORS[lead.status] || ""}`}
                       >
@@ -185,6 +242,15 @@ export default function LeadTable({ leads, onEdit }) {
                         <span className="text-slate-700">—</span>
                       )}
                     </td>
+                    {/* Custom column cells */}
+                    {customColumns.map((col) => (
+                      <td
+                        key={col.id}
+                        className="px-5 py-4 text-sm whitespace-nowrap"
+                      >
+                        <CustomCell col={col} value={lead[col.id]} />
+                      </td>
+                    ))}
                     <td
                       className="px-5 py-4 text-right whitespace-nowrap"
                       onClick={(e) => e.stopPropagation()}
@@ -203,13 +269,12 @@ export default function LeadTable({ leads, onEdit }) {
                       </button>
                     </td>
                   </tr>
-                  {/* Expanded notes row */}
                   {expandedId === lead.id && (
                     <tr
                       key={`${lead.id}-expanded`}
                       className="bg-slate-900/50 border-b border-slate-800/60"
                     >
-                      <td colSpan={8} className="px-6 py-4">
+                      <td colSpan={allColumns.length + 1} className="px-6 py-4">
                         <div className="flex flex-wrap gap-5 text-sm text-slate-400">
                           {lead.phone && (
                             <span>
@@ -238,14 +303,14 @@ export default function LeadTable({ leads, onEdit }) {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
 
           {leads.length === 0 && (
             <div className="text-center py-16 text-slate-600 text-base">
-              No leads yet — add your first one above.
+              No leads yet — add your first one.
             </div>
           )}
         </div>
@@ -301,6 +366,15 @@ export default function LeadTable({ leads, onEdit }) {
                       {lead.address}
                     </p>
                   )}
+                  {customColumns.map(
+                    (col) =>
+                      lead[col.id] !== undefined && (
+                        <p key={col.id} className="text-sm text-slate-400">
+                          <span className="text-slate-600">{col.label}: </span>
+                          <CustomCell col={col} value={lead[col.id]} />
+                        </p>
+                      ),
+                  )}
                   {lead.notes && (
                     <p className="text-sm text-slate-500 italic">
                       "{lead.notes}"
@@ -335,7 +409,6 @@ export default function LeadTable({ leads, onEdit }) {
         </div>
       </div>
 
-      {/* Delete confirmation modal */}
       {deleteTarget && (
         <DeleteConfirmModal
           lead={deleteTarget}

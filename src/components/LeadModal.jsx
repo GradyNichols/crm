@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { STATUSES, OUTREACH_TYPES } from "../constants";
+import useCRMStore from "../store/useCRMStore";
 
 const EMPTY_FORM = {
   businessName: "",
@@ -16,6 +17,7 @@ const EMPTY_FORM = {
 };
 
 export default function LeadModal({ onClose, onSave, existing }) {
+  const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const [form, setForm] = useState(
     existing ? { ...existing } : { ...EMPTY_FORM },
   );
@@ -38,7 +40,7 @@ export default function LeadModal({ onClose, onSave, existing }) {
   const validate = () => {
     const e = {};
     if (!form.businessName.trim()) e.businessName = "Required";
-    if (!form.phone.trim() && !form.email.trim())
+    if (!form.phone?.trim() && !form.email?.trim())
       e.phone = "Phone or email required";
     if (!form.status) e.status = "Required";
     return e;
@@ -82,7 +84,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
 
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
-          {/* Business Name */}
           <Field label="Business Name" required error={errors.businessName}>
             <input
               autoFocus
@@ -93,7 +94,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             />
           </Field>
 
-          {/* Owner */}
           <Field label="Owner Name">
             <input
               value={form.ownerName}
@@ -103,7 +103,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             />
           </Field>
 
-          {/* Contact row */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Phone" error={errors.phone}>
               <input
@@ -125,7 +124,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             </Field>
           </div>
 
-          {/* Address */}
           <Field label="Address">
             <input
               value={form.address}
@@ -135,7 +133,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             />
           </Field>
 
-          {/* Type + Status row */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Outreach Type">
               <select
@@ -165,7 +162,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             </Field>
           </div>
 
-          {/* Strength */}
           <Field
             label={`Strength: ${["", "★☆☆☆☆", "★★☆☆☆", "★★★☆☆", "★★★★☆", "★★★★★"][form.strength]}`}
           >
@@ -183,7 +179,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             </div>
           </Field>
 
-          {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Last Touch Date">
               <input
@@ -203,7 +198,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             </Field>
           </div>
 
-          {/* Notes */}
           <Field label="Notes">
             <textarea
               rows={3}
@@ -213,6 +207,24 @@ export default function LeadModal({ onClose, onSave, existing }) {
               className={`${inputClass()} resize-none`}
             />
           </Field>
+
+          {/* ── Custom columns ── */}
+          {customColumns.length > 0 && (
+            <div className="border-t border-slate-800 pt-4 space-y-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Custom Fields
+              </p>
+              {customColumns.map((col) => (
+                <Field key={col.id} label={col.label}>
+                  <CustomFieldInput
+                    col={col}
+                    value={form[col.id]}
+                    onChange={(val) => set(col.id, val)}
+                  />
+                </Field>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -225,11 +237,7 @@ export default function LeadModal({ onClose, onSave, existing }) {
           </button>
           <button
             onClick={handleSubmit}
-            className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
-              saved
-                ? "bg-green-600 text-white"
-                : "bg-blue-600 hover:bg-blue-500 text-white"
-            }`}
+            className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${saved ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white"}`}
           >
             {saved ? "✓ Saved" : existing ? "Save Changes" : "Add Lead"}
           </button>
@@ -237,6 +245,94 @@ export default function LeadModal({ onClose, onSave, existing }) {
       </div>
     </div>
   );
+}
+
+function CustomFieldInput({ col, value, onChange }) {
+  if (col.type === "text") {
+    return (
+      <input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass()}
+      />
+    );
+  }
+  if (col.type === "number") {
+    return (
+      <input
+        type="number"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass()}
+      />
+    );
+  }
+  if (col.type === "date") {
+    return (
+      <input
+        type="date"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass()}
+      />
+    );
+  }
+  if (col.type === "select") {
+    return (
+      <select
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass()}
+      >
+        <option value="">— Select —</option>
+        {col.options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (col.type === "checkbox") {
+    return (
+      <div className="flex items-center gap-3 py-1">
+        <input
+          type="checkbox"
+          id={`check_${col.id}`}
+          checked={!!value}
+          onChange={(e) => onChange(e.target.checked)}
+          className="w-4 h-4 accent-blue-500 cursor-pointer"
+        />
+        <label
+          htmlFor={`check_${col.id}`}
+          className="text-sm text-slate-400 cursor-pointer select-none"
+        >
+          {value ? "Yes" : "No"}
+        </label>
+      </div>
+    );
+  }
+  if (col.type === "stars") {
+    const val = Number(value) || 0;
+    return (
+      <div className="space-y-1">
+        <input
+          type="range"
+          min={1}
+          max={5}
+          value={val || 1}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full accent-blue-500 cursor-pointer"
+        />
+        <p className="text-amber-400 text-sm">
+          {"★".repeat(val)}
+          <span className="text-slate-700">{"★".repeat(5 - val)}</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
 }
 
 function Field({ label, required, error, children }) {

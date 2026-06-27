@@ -12,6 +12,10 @@ import LeadTable from "./components/LeadTable";
 import LeadModal from "./components/LeadModal";
 import Settings from "./pages/Settings";
 import Search from "./pages/Search";
+import Checklist from "./pages/Checklist";
+import Reference from "./pages/Reference";
+import AI from "./pages/AI";
+import LeadDetail from "./pages/LeadDetail";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 
@@ -34,6 +38,61 @@ function HamburgerIcon() {
   );
 }
 
+function ChecklistIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-6 h-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+      />
+    </svg>
+  );
+}
+
+function AIIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-6 h-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"
+      />
+    </svg>
+  );
+}
+function ReferenceIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-6 h-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"
+      />
+    </svg>
+  );
+}
 function SearchIcon() {
   return (
     <svg
@@ -84,6 +143,9 @@ function Sidebar({ open, onClose }) {
   const location = useLocation();
   const panelRef = useRef(null);
   const onSearch = location.pathname === "/search";
+  const onChecklist = location.pathname === "/checklist";
+  const onReference = location.pathname === "/reference";
+  const onAI = location.pathname === "/ai";
   const onSettings = location.pathname === "/settings";
 
   // Close on outside click
@@ -153,6 +215,24 @@ function Sidebar({ open, onClose }) {
         {/* Mobile-only nav items */}
         <nav className="flex-1 px-3 py-4 space-y-1 sm:hidden">
           <SidebarNavItem
+            label="Pipeline Advisor"
+            icon={<AIIcon />}
+            active={onAI}
+            onClick={() => go("/ai")}
+          />
+          <SidebarNavItem
+            label="Reference"
+            icon={<ReferenceIcon />}
+            active={onReference}
+            onClick={() => go("/reference")}
+          />
+          <SidebarNavItem
+            label="Checklist"
+            icon={<ChecklistIcon />}
+            active={onChecklist}
+            onClick={() => go("/checklist")}
+          />
+          <SidebarNavItem
             label="Search"
             icon={<SearchIcon />}
             active={onSearch}
@@ -194,22 +274,160 @@ function SidebarNavItem({ label, icon, active, onClick }) {
   );
 }
 
+// ── CSV Export ─────────────────────────────────────────────────────────────────
+
+function exportCSV(leads, customColumns) {
+  const baseHeaders = [
+    "Business Name",
+    "Owner",
+    "Phone",
+    "Email",
+    "Address",
+    "Type",
+    "Strength",
+    "Status",
+    "Last Touch",
+    "Follow-up",
+    "Notes History",
+  ];
+  const customHeaders = customColumns.map((c) => c.label);
+  const headers = [...baseHeaders, ...customHeaders];
+
+  const escape = (val) => {
+    if (val === undefined || val === null) return "";
+    const str = String(val);
+    return str.includes(",") || str.includes('"') || str.includes("\n")
+      ? `"${str.replace(/"/g, '""')}"`
+      : str;
+  };
+
+  const rows = leads.map((l) => {
+    const notesText = (l.notesLog || [])
+      .map((n) => `[${n.ts}] ${n.text}`)
+      .join(" | ");
+    const base = [
+      l.businessName,
+      l.ownerName,
+      l.phone,
+      l.email,
+      l.address,
+      l.type,
+      l.strength,
+      l.status,
+      l.lastTouchDate,
+      l.followUpDate,
+      notesText,
+    ];
+    const custom = customColumns.map((c) => l[c.id] ?? "");
+    return [...base, ...custom].map(escape).join(",");
+  });
+
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `crm-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Group tabs ─────────────────────────────────────────────────────────────────
+
+function GroupTabs({ groups, activeGroup, onChange }) {
+  if (groups.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1 mb-5 overflow-x-auto pb-1">
+      <button
+        onClick={() => onChange(null)}
+        className={`text-sm px-4 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 ${
+          activeGroup === null
+            ? "bg-blue-600 text-white"
+            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+        }`}
+      >
+        All
+      </button>
+      {groups.map((g) => (
+        <button
+          key={g.id}
+          onClick={() => onChange(g.id === activeGroup ? null : g.id)}
+          className={`text-sm px-4 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 ${
+            activeGroup === g.id
+              ? "bg-blue-600 text-white"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+          }`}
+        >
+          {g.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Dashboard ──────────────────────────────────────────────────────────────────
 
-function Dashboard({ onEditLead }) {
-  const { leads } = useCRMStore();
+function Dashboard({ onEditLead, onAddLead }) {
+  const leads = useCRMStore((s) => s.leads);
+  const customColumns = useCRMStore((s) => s.customColumns) ?? [];
+  const groups = useCRMStore((s) => s.groups) ?? [];
   const [statusFilter, setStatusFilter] = useState(null);
-  const filteredLeads = statusFilter
-    ? leads.filter((l) => l.status === statusFilter)
+  const [activeGroup, setActiveGroup] = useState(null);
+
+  const groupFiltered = activeGroup
+    ? leads.filter((l) => l.groupId === activeGroup)
     : leads;
+  const filteredLeads = statusFilter
+    ? groupFiltered.filter((l) => l.status === statusFilter)
+    : groupFiltered;
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <GroupTabs
+        groups={groups}
+        activeGroup={activeGroup}
+        onChange={(g) => {
+          setActiveGroup(g);
+          setStatusFilter(null);
+        }}
+      />
       <SummaryBar
-        leads={leads}
+        leads={groupFiltered}
         statusFilter={statusFilter}
         onStatusClick={(s) => setStatusFilter((p) => (p === s ? null : s))}
       />
+      {/* Table toolbar */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-slate-600">
+          {filteredLeads.length} {statusFilter ? `${statusFilter} ` : ""}
+          {activeGroup
+            ? `· ${groups.find((g) => g.id === activeGroup)?.name} `
+            : ""}
+          lead{filteredLeads.length !== 1 ? "s" : ""}
+        </p>
+        <button
+          onClick={() => exportCSV(filteredLeads, customColumns)}
+          disabled={filteredLeads.length === 0}
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Export visible leads to CSV"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.8}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+            />
+          </svg>
+          Export CSV
+        </button>
+      </div>
       <LeadTable leads={filteredLeads} onEdit={onEditLead} />
     </main>
   );
@@ -226,6 +444,9 @@ export default function App() {
   const navigate = useNavigate();
   const onSettings = location.pathname === "/settings";
   const onSearch = location.pathname === "/search";
+  const onChecklist = location.pathname === "/checklist";
+  const onReference = location.pathname === "/reference";
+  const onAI = location.pathname === "/ai";
 
   const handleSave = (form) => {
     if (editingLead) updateLead(editingLead.id, form);
@@ -240,6 +461,9 @@ export default function App() {
     setShowModal(false);
     setEditingLead(null);
   };
+  const handleChecklistClick = () => navigate(onChecklist ? "/" : "/checklist");
+  const handleReferenceClick = () => navigate(onReference ? "/" : "/reference");
+  const handleAIClick = () => navigate(onAI ? "/" : "/ai");
   const handleSearchClick = () => navigate(onSearch ? "/" : "/search");
   const handleSettingsClick = () => navigate(onSettings ? "/" : "/settings");
 
@@ -262,10 +486,10 @@ export default function App() {
           </button>
 
           {/* Title */}
-          <div className="flex-1 px-2">
+          <div className="flex-1">
             <NavLink to="/">
               <h1 className="text-xl font-semibold text-slate-100 tracking-tight hover:text-blue-400 transition-colors">
-                CRM Dashboard
+                Restaurant CRM
               </h1>
             </NavLink>
             <p className="text-sm text-slate-600 mt-0.5 hidden sm:block">
@@ -275,7 +499,43 @@ export default function App() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {/* Search + Settings — desktop only */}
+            {/* Checklist + Search + Settings — desktop only */}
+            <button
+              onClick={handleAIClick}
+              className={`hidden sm:flex p-2.5 rounded-lg transition-colors ${
+                onAI
+                  ? "text-blue-400 bg-blue-950/50"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+              }`}
+              title={onAI ? "Back to dashboard" : "Pipeline Advisor"}
+            >
+              <AIIcon />
+            </button>
+
+            <button
+              onClick={handleReferenceClick}
+              className={`hidden sm:flex p-2.5 rounded-lg transition-colors ${
+                onReference
+                  ? "text-blue-400 bg-blue-950/50"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+              }`}
+              title={onReference ? "Back to dashboard" : "Reference"}
+            >
+              <ReferenceIcon />
+            </button>
+
+            <button
+              onClick={handleChecklistClick}
+              className={`hidden sm:flex p-2.5 rounded-lg transition-colors ${
+                onChecklist
+                  ? "text-blue-400 bg-blue-950/50"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+              }`}
+              title={onChecklist ? "Back to dashboard" : "Outreach checklist"}
+            >
+              <ChecklistIcon />
+            </button>
+
             <button
               onClick={handleSearchClick}
               className={`hidden sm:flex p-2.5 rounded-lg transition-colors ${
@@ -290,7 +550,7 @@ export default function App() {
 
             <button
               onClick={handleSettingsClick}
-              className={`mr-1 hidden sm:flex p-2.5 rounded-lg transition-colors ${
+              className={`mr-2 hidden sm:flex p-2.5 rounded-lg transition-colors ${
                 onSettings
                   ? "text-blue-400 bg-blue-950/50"
                   : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
@@ -301,30 +561,38 @@ export default function App() {
             </button>
 
             {/* Add Lead — desktop only on non-settings/search pages */}
-            {!onSettings && !onSearch && (
-              <button
-                onClick={() => {
-                  setEditingLead(null);
-                  setShowModal(true);
-                }}
-                className="hidden sm:flex bg-blue-600 hover:bg-blue-500 text-white text-base font-medium px-5 py-2.5 rounded-lg transition-colors"
-              >
-                + Add Lead
-              </button>
-            )}
+            {!onSettings &&
+              !onSearch &&
+              !onChecklist &&
+              !onReference &&
+              !onAI && (
+                <button
+                  onClick={() => {
+                    setEditingLead(null);
+                    setShowModal(true);
+                  }}
+                  className="hidden sm:flex bg-blue-600 hover:bg-blue-500 text-white text-base font-medium px-5 py-2.5 rounded-lg transition-colors"
+                >
+                  + Add Lead
+                </button>
+              )}
 
             {/* Mobile: Add Lead (dashboard only) */}
-            {!onSettings && !onSearch && (
-              <button
-                onClick={() => {
-                  setEditingLead(null);
-                  setShowModal(true);
-                }}
-                className="sm:hidden bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                + Add Lead
-              </button>
-            )}
+            {!onSettings &&
+              !onSearch &&
+              !onChecklist &&
+              !onReference &&
+              !onAI && (
+                <button
+                  onClick={() => {
+                    setEditingLead(null);
+                    setShowModal(true);
+                  }}
+                  className="sm:hidden bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  + Add Lead
+                </button>
+              )}
 
             {/* Hamburger — mobile only, right side */}
             <button
@@ -342,6 +610,10 @@ export default function App() {
         <Route path="/" element={<Dashboard onEditLead={handleEdit} />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/checklist" element={<Checklist />} />
+        <Route path="/reference" element={<Reference />} />
+        <Route path="/ai" element={<AI />} />
+        <Route path="/lead/:id" element={<LeadDetail />} />
       </Routes>
 
       {showModal && (

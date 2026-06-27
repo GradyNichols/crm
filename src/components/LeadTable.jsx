@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { COLUMNS, STATUS_COLORS } from "../constants";
+import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { COLUMNS, STATUS_COLORS, STATUSES } from "../constants";
 import { ICONS } from "../icons";
 import useCRMStore from "../store/useCRMStore";
 
@@ -21,29 +22,107 @@ function TypeBadge({ type }) {
   };
   return (
     <span
-      className={`text-sm px-2.5 py-1 rounded-full font-medium ${colors[type] || "bg-slate-700 text-slate-300"}`}
+      className={`text-sm px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${colors[type] || "bg-slate-700 text-slate-300"}`}
     >
       {type}
     </span>
   );
 }
 
-// Render a custom column cell value based on its type
 function CustomCell({ col, value }) {
-  if (value === undefined || value === null || value === "") {
+  if (value === undefined || value === null || value === "")
     return <span className="text-slate-700">—</span>;
-  }
-  if (col.type === "checkbox") {
+  if (col.type === "checkbox")
     return (
       <span className={value ? "text-green-400" : "text-slate-600"}>
         {value ? "✓ Yes" : "✗ No"}
       </span>
     );
-  }
-  if (col.type === "stars") {
-    return <StarRating value={Number(value)} />;
-  }
+  if (col.type === "stars") return <StarRating value={Number(value)} />;
   return <span className="text-slate-300">{String(value)}</span>;
+}
+
+// Inline status dropdown
+function StatusCell({ lead }) {
+  const updateLead = useCRMStore((s) => s.updateLead);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap transition-opacity hover:opacity-80 ${STATUS_COLORS[lead.status] || ""}`}
+      >
+        {lead.status}
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-20 bg-[#0d1117] border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[120px]">
+          {STATUSES.map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                updateLead(lead.id, { status: s });
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 ${
+                lead.status === s ? "text-blue-400" : "text-slate-300"
+              }`}
+            >
+              <span
+                className={`inline-block w-2 h-2 rounded-full mr-2 ${STATUS_COLORS[s]?.split(" ")[0] || "bg-slate-600"}`}
+              />
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Notes log display inside expanded row
+function NotesLog({ lead }) {
+  const deleteNoteEntry = useCRMStore((s) => s.deleteNoteEntry);
+  const log = lead.notesLog || [];
+  if (log.length === 0)
+    return <p className="text-sm text-slate-700 italic mt-2">No notes yet.</p>;
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-xs text-slate-600 uppercase tracking-widest">Notes</p>
+      {[...log].reverse().map((entry) => (
+        <div
+          key={entry.id}
+          className="flex items-start justify-between gap-3 group"
+        >
+          <div className="flex items-start gap-2">
+            <span className="text-slate-700 text-xs mt-0.5 whitespace-nowrap">
+              {entry.ts}
+            </span>
+            <p className="text-sm text-slate-400">{entry.text}</p>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteNoteEntry(lead.id, entry.id);
+            }}
+            className="text-slate-700 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-all shrink-0"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function DeleteConfirmModal({ lead, onConfirm, onCancel }) {
@@ -106,6 +185,8 @@ export default function LeadTable({ leads, onEdit }) {
   const sortDir = useCRMStore((s) => s.sortDir);
   const setSort = useCRMStore((s) => s.setSort);
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
+  const groups = useCRMStore((s) => s.groups) ?? [];
+  const updateLead = useCRMStore((s) => s.updateLead);
   const deleteLead = useCRMStore((s) => s.deleteLead);
   const [expandedId, setExpandedId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -169,7 +250,7 @@ export default function LeadTable({ leads, onEdit }) {
   return (
     <>
       <div className="rounded-xl border border-slate-800 overflow-hidden">
-        {/* Desktop table */}
+        {/* Desktop */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-base">
             <thead>
@@ -197,12 +278,16 @@ export default function LeadTable({ leads, onEdit }) {
                     onClick={() =>
                       setExpandedId(expandedId === lead.id ? null : lead.id)
                     }
-                    className={`border-b border-slate-800/60 cursor-pointer transition-colors ${
-                      i % 2 === 0 ? "bg-slate-900/20" : "bg-transparent"
-                    } hover:bg-slate-800/40`}
+                    className={`border-b border-slate-800/60 cursor-pointer transition-colors ${i % 2 === 0 ? "bg-slate-900/20" : "bg-transparent"} hover:bg-slate-800/40`}
                   >
-                    <td className="px-5 py-4 text-slate-100 font-semibold whitespace-nowrap text-base">
-                      {lead.businessName}
+                    <td className="px-5 py-4 font-semibold whitespace-nowrap">
+                      <Link
+                        to={`/lead/${lead.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-slate-100 hover:text-blue-400 transition-colors"
+                      >
+                        {lead.businessName}
+                      </Link>
                     </td>
                     <td className="px-5 py-4 text-slate-400 whitespace-nowrap">
                       {lead.ownerName || (
@@ -216,11 +301,7 @@ export default function LeadTable({ leads, onEdit }) {
                       <StarRating value={lead.strength} />
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
-                      <span
-                        className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COLORS[lead.status] || ""}`}
-                      >
-                        {lead.status}
-                      </span>
+                      <StatusCell lead={lead} />
                     </td>
                     <td className="px-5 py-4 text-slate-500 text-sm whitespace-nowrap">
                       {lead.lastTouchDate || (
@@ -242,7 +323,6 @@ export default function LeadTable({ leads, onEdit }) {
                         <span className="text-slate-700">—</span>
                       )}
                     </td>
-                    {/* Custom column cells */}
                     {customColumns.map((col) => (
                       <td
                         key={col.id}
@@ -271,11 +351,11 @@ export default function LeadTable({ leads, onEdit }) {
                   </tr>
                   {expandedId === lead.id && (
                     <tr
-                      key={`${lead.id}-expanded`}
+                      key={`${lead.id}-exp`}
                       className="bg-slate-900/50 border-b border-slate-800/60"
                     >
                       <td colSpan={allColumns.length + 1} className="px-6 py-4">
-                        <div className="flex flex-wrap gap-5 text-sm text-slate-400">
+                        <div className="flex flex-wrap gap-5 text-sm text-slate-400 items-center">
                           {lead.phone && (
                             <span>
                               {ICONS.phone}
@@ -294,12 +374,43 @@ export default function LeadTable({ leads, onEdit }) {
                               {lead.address}
                             </span>
                           )}
+                          {groups.length > 0 && (
+                            <span className="flex items-center gap-1.5">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="w-3.5 h-3.5 opacity-50 shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.8}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
+                                />
+                              </svg>
+                              <select
+                                value={lead.groupId || ""}
+                                onChange={(e) =>
+                                  updateLead(lead.id, {
+                                    groupId: e.target.value || null,
+                                  })
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-slate-800/80 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                              >
+                                <option value="">No group</option>
+                                {groups.map((g) => (
+                                  <option key={g.id} value={g.id}>
+                                    {g.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </span>
+                          )}
                         </div>
-                        {lead.notes && (
-                          <p className="text-sm text-slate-500 mt-2 italic">
-                            "{lead.notes}"
-                          </p>
-                        )}
+                        <NotesLog lead={lead} />
                       </td>
                     </tr>
                   )}
@@ -307,7 +418,6 @@ export default function LeadTable({ leads, onEdit }) {
               ))}
             </tbody>
           </table>
-
           {leads.length === 0 && (
             <div className="text-center py-16 text-slate-600 text-base">
               No leads yet — add your first one.
@@ -315,7 +425,7 @@ export default function LeadTable({ leads, onEdit }) {
           )}
         </div>
 
-        {/* Mobile card list */}
+        {/* Mobile */}
         <div className="md:hidden divide-y divide-slate-800">
           {sorted.map((lead) => (
             <div
@@ -326,14 +436,16 @@ export default function LeadTable({ leads, onEdit }) {
               }
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="text-slate-100 font-semibold text-base">
-                  {lead.businessName}
-                </span>
-                <span
-                  className={`text-sm px-2.5 py-0.5 rounded-full shrink-0 font-medium ${STATUS_COLORS[lead.status] || ""}`}
+                <Link
+                  to={`/lead/${lead.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-slate-100 font-semibold text-base hover:text-blue-400 transition-colors"
                 >
-                  {lead.status}
-                </span>
+                  {lead.businessName}
+                </Link>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <StatusCell lead={lead} />
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <TypeBadge type={lead.type} />
@@ -375,27 +487,46 @@ export default function LeadTable({ leads, onEdit }) {
                         </p>
                       ),
                   )}
-                  {lead.notes && (
-                    <p className="text-sm text-slate-500 italic">
-                      "{lead.notes}"
-                    </p>
-                  )}
+                  <NotesLog lead={lead} />
                   <div
-                    className="flex gap-4 pt-2"
+                    className="pt-2 space-y-2"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      onClick={() => onEdit(lead)}
-                      className="text-sm text-blue-400 hover:text-blue-300"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(lead)}
-                      className="text-sm text-red-500 hover:text-red-400"
-                    >
-                      Delete
-                    </button>
+                    {groups.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-600">Group:</span>
+                        <select
+                          value={lead.groupId || ""}
+                          onChange={(e) =>
+                            updateLead(lead.id, {
+                              groupId: e.target.value || null,
+                            })
+                          }
+                          className="bg-slate-800/80 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-blue-500 transition-colors"
+                        >
+                          <option value="">No group</option>
+                          {groups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => onEdit(lead)}
+                        className="text-sm text-blue-400 hover:text-blue-300"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(lead)}
+                        className="text-sm text-red-500 hover:text-red-400"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

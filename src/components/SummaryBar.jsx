@@ -10,11 +10,22 @@ import { STATUS_COLORS } from "../constants";
 export default function SummaryBar({ leads, statusFilter, onStatusClick }) {
   const today = startOfToday();
   const weekEnd = addDays(today, 7);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const statusCounts = leads.reduce((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
     return acc;
   }, {});
+
+  const overdueLeads = leads
+    .filter(
+      (l) =>
+        l.followUpDate &&
+        l.followUpDate < todayStr &&
+        l.lastTouchDate !== todayStr &&
+        !["Closed", "Dead"].includes(l.status),
+    )
+    .sort((a, b) => a.followUpDate.localeCompare(b.followUpDate));
 
   const upcomingFollowUps = leads
     .filter((l) => {
@@ -29,7 +40,7 @@ export default function SummaryBar({ leads, statusFilter, onStatusClick }) {
 
   return (
     <div className="space-y-4 mb-6">
-      {/* Top row: counts */}
+      {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Total Leads" value={leads.length} />
         <StatCard
@@ -50,7 +61,7 @@ export default function SummaryBar({ leads, statusFilter, onStatusClick }) {
         />
       </div>
 
-      {/* Status breakdown — filterable buttons */}
+      {/* Status filter badges */}
       <div className="flex flex-wrap gap-2 items-center">
         {Object.entries(statusCounts).map(([status, count]) => {
           const isActive = statusFilter === status;
@@ -77,6 +88,52 @@ export default function SummaryBar({ leads, statusFilter, onStatusClick }) {
           </button>
         )}
       </div>
+
+      {/* Overdue leads */}
+      {overdueLeads.length > 0 && (
+        <div className="rounded-lg border border-red-900/50 bg-red-950/20 p-4">
+          <p className="text-xs uppercase tracking-widest text-red-500 mb-3 flex items-center gap-1.5">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+              />
+            </svg>
+            {overdueLeads.length} overdue follow-up
+            {overdueLeads.length !== 1 ? "s" : ""}
+          </p>
+          <div className="space-y-2">
+            {overdueLeads.map((l) => (
+              <div
+                key={l.id}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="text-slate-200 font-medium">
+                  {l.businessName}
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-red-400 text-xs font-medium">
+                    {l.followUpDate}
+                  </span>
+                  <span
+                    className={`text-xs px-2.5 py-0.5 rounded-full ${STATUS_COLORS[l.status] || ""}`}
+                  >
+                    {l.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming follow-ups */}
       {upcomingFollowUps.length > 0 && (
@@ -119,13 +176,7 @@ function StatCard({ label, value, highlight, green }) {
         {label}
       </p>
       <p
-        className={`text-3xl font-semibold tabular-nums ${
-          green
-            ? "text-green-400"
-            : highlight
-              ? "text-blue-400"
-              : "text-slate-100"
-        }`}
+        className={`text-3xl font-semibold tabular-nums ${green ? "text-green-400" : highlight ? "text-blue-400" : "text-slate-100"}`}
       >
         {value}
       </p>

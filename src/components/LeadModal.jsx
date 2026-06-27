@@ -13,23 +13,31 @@ const EMPTY_FORM = {
   status: "Cold",
   lastTouchDate: "",
   followUpDate: "",
-  notes: "",
+  notes: "", // used as "new note to append"
+  groupId: null,
 };
 
 export default function LeadModal({ onClose, onSave, existing }) {
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
-  const [form, setForm] = useState(
-    existing ? { ...existing } : { ...EMPTY_FORM },
-  );
+  const groups = useCRMStore((s) => s.groups) ?? [];
+
+  const buildForm = () => {
+    if (!existing) return { ...EMPTY_FORM };
+    // Strip notesLog — we only show add-note field in modal
+    const { notesLog, ...rest } = existing;
+    return { ...EMPTY_FORM, ...rest, notes: "" };
+  };
+
+  const [form, setForm] = useState(buildForm);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const handleKey = (e) => {
+    const handler = (e) => {
       if (e.key === "Escape") onClose();
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
   const set = (key, val) => {
@@ -56,7 +64,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
-      if (!existing) setForm({ ...EMPTY_FORM });
       onClose();
     }, 700);
   };
@@ -69,7 +76,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
       }}
     >
       <div className="w-full max-w-xl bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h2 className="text-base font-semibold text-slate-100">
             {existing ? "Edit Lead" : "Add Lead"}
@@ -82,7 +88,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
           </button>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5 space-y-4">
           <Field label="Business Name" required error={errors.businessName}>
             <input
@@ -162,6 +167,23 @@ export default function LeadModal({ onClose, onSave, existing }) {
             </Field>
           </div>
 
+          {groups.length > 0 && (
+            <Field label="Group">
+              <select
+                value={form.groupId || ""}
+                onChange={(e) => set("groupId", e.target.value || null)}
+                className={inputClass()}
+              >
+                <option value="">— No group —</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
           <Field
             label={`Strength: ${["", "★☆☆☆☆", "★★☆☆☆", "★★★☆☆", "★★★★☆", "★★★★★"][form.strength]}`}
           >
@@ -198,17 +220,26 @@ export default function LeadModal({ onClose, onSave, existing }) {
             </Field>
           </div>
 
-          <Field label="Notes">
+          <Field label={existing ? "Add a Note" : "Initial Note"}>
             <textarea
-              rows={3}
+              rows={2}
               value={form.notes}
               onChange={(e) => set("notes", e.target.value)}
-              placeholder="Anything worth remembering..."
+              placeholder={
+                existing
+                  ? "Append a new note to history…"
+                  : "First note (optional)…"
+              }
               className={`${inputClass()} resize-none`}
             />
+            {existing && (
+              <p className="text-xs text-slate-700 mt-0.5">
+                This will be added to the notes history, not replace it.
+              </p>
+            )}
           </Field>
 
-          {/* ── Custom columns ── */}
+          {/* Custom fields */}
           {customColumns.length > 0 && (
             <div className="border-t border-slate-800 pt-4 space-y-4">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -227,7 +258,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800">
           <button
             onClick={onClose}
@@ -248,7 +278,7 @@ export default function LeadModal({ onClose, onSave, existing }) {
 }
 
 function CustomFieldInput({ col, value, onChange }) {
-  if (col.type === "text") {
+  if (col.type === "text")
     return (
       <input
         type="text"
@@ -257,8 +287,7 @@ function CustomFieldInput({ col, value, onChange }) {
         className={inputClass()}
       />
     );
-  }
-  if (col.type === "number") {
+  if (col.type === "number")
     return (
       <input
         type="number"
@@ -267,8 +296,7 @@ function CustomFieldInput({ col, value, onChange }) {
         className={inputClass()}
       />
     );
-  }
-  if (col.type === "date") {
+  if (col.type === "date")
     return (
       <input
         type="date"
@@ -277,8 +305,7 @@ function CustomFieldInput({ col, value, onChange }) {
         className={inputClass()}
       />
     );
-  }
-  if (col.type === "select") {
+  if (col.type === "select")
     return (
       <select
         value={value || ""}
@@ -293,8 +320,7 @@ function CustomFieldInput({ col, value, onChange }) {
         ))}
       </select>
     );
-  }
-  if (col.type === "checkbox") {
+  if (col.type === "checkbox")
     return (
       <div className="flex items-center gap-3 py-1">
         <input
@@ -312,16 +338,15 @@ function CustomFieldInput({ col, value, onChange }) {
         </label>
       </div>
     );
-  }
   if (col.type === "stars") {
-    const val = Number(value) || 0;
+    const val = Number(value) || 1;
     return (
       <div className="space-y-1">
         <input
           type="range"
           min={1}
           max={5}
-          value={val || 1}
+          value={val}
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full accent-blue-500 cursor-pointer"
         />
@@ -349,7 +374,5 @@ function Field({ label, required, error, children }) {
 }
 
 function inputClass(error) {
-  return `w-full bg-slate-800/60 border ${
-    error ? "border-red-500" : "border-slate-700"
-  } text-slate-100 text-sm rounded-lg px-3 py-2 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors`;
+  return `w-full bg-slate-800/60 border ${error ? "border-red-500" : "border-slate-700"} text-slate-100 text-sm rounded-lg px-3 py-2 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors`;
 }

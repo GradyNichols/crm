@@ -13,7 +13,7 @@ const FIELD_TYPES = [
 
 const EMPTY_FORM = { label: "", type: "text", options: "" };
 
-function DeleteColModal({ col, onConfirm, onCancel }) {
+function DeleteConfirmModal({ col, label, onConfirm, onCancel }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
@@ -44,8 +44,8 @@ function DeleteColModal({ col, onConfirm, onCancel }) {
               Delete column?
             </h3>
             <p className="text-slate-500 text-sm mt-0.5">
-              <span className="text-slate-300">"{col.label}"</span> and all its
-              data will be permanently removed from every lead.
+              <span className="text-slate-300">"{label || col.label}"</span> and
+              all its data will be permanently removed from every lead.
             </p>
           </div>
         </div>
@@ -73,10 +73,17 @@ export default function Settings() {
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const addCustomColumn = useCRMStore((s) => s.addCustomColumn);
   const deleteCustomColumn = useCRMStore((s) => s.deleteCustomColumn);
+  const groups = useCRMStore((s) => s.groups) ?? [];
+  const { addGroup, renameGroup, deleteGroup } = useCRMStore.getState();
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [errors, setErrors] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [groupError, setGroupError] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
+  const [deleteGroupTarget, setDeleteGroupTarget] = useState(null);
 
   const setField = (key, val) => {
     setForm((f) => ({ ...f, [key]: val }));
@@ -147,11 +154,130 @@ export default function Settings() {
         <div>
           <h2 className="text-2xl font-semibold text-slate-100">Settings</h2>
           <p className="text-slate-500 text-sm mt-1">
-            Manage custom columns for your lead table.
+            Manage groups and custom columns.
           </p>
         </div>
       </div>
 
+      {/* ── Groups ── */}
+      <section>
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
+          Groups ({groups.length})
+        </h3>
+
+        {groups.length === 0 ? (
+          <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-6 py-8 text-center">
+            <p className="text-slate-600 text-sm">No groups yet.</p>
+            <p className="text-slate-700 text-xs mt-1">
+              Groups let you segment leads by region or campaign.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-slate-800 overflow-hidden divide-y divide-slate-800">
+            {groups.map((g) => (
+              <div
+                key={g.id}
+                className="flex items-center gap-3 px-5 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
+              >
+                {editingGroupId === g.id ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={editingGroupName}
+                      onChange={(e) => setEditingGroupName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          renameGroup(g.id, editingGroupName);
+                          setEditingGroupId(null);
+                        }
+                        if (e.key === "Escape") setEditingGroupId(null);
+                      }}
+                      className="flex-1 bg-slate-800 border border-blue-500 text-slate-100 text-sm rounded-lg px-3 py-1.5 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        renameGroup(g.id, editingGroupName);
+                        setEditingGroupId(null);
+                      }}
+                      className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingGroupId(null)}
+                      className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-slate-100 font-medium text-base flex-1">
+                      {g.name}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setEditingGroupId(g.id);
+                        setEditingGroupName(g.name);
+                      }}
+                      className="text-sm text-blue-400 hover:text-blue-300 transition-colors mr-2"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={() => setDeleteGroupTarget(g)}
+                      className="text-sm text-slate-600 hover:text-red-400 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add group */}
+        <div className="mt-3 flex gap-2">
+          <input
+            value={newGroupName}
+            onChange={(e) => {
+              setNewGroupName(e.target.value);
+              setGroupError("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (!newGroupName.trim()) {
+                  setGroupError("Name required");
+                  return;
+                }
+                addGroup(newGroupName);
+                setNewGroupName("");
+              }
+            }}
+            placeholder="New group name…"
+            className={`flex-1 bg-slate-800/60 border ${groupError ? "border-red-500" : "border-slate-700"} text-slate-100 text-sm rounded-lg px-3 py-2 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors`}
+          />
+          <button
+            onClick={() => {
+              if (!newGroupName.trim()) {
+                setGroupError("Name required");
+                return;
+              }
+              addGroup(newGroupName);
+              setNewGroupName("");
+            }}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0"
+          >
+            Add
+          </button>
+        </div>
+        {groupError && (
+          <p className="text-xs text-red-400 mt-1">{groupError}</p>
+        )}
+      </section>
+
+      {/* ── Custom columns ── */}
       {/* Existing custom columns */}
       <section>
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
@@ -305,9 +431,22 @@ export default function Settings() {
         </div>
       </section>
 
-      {/* Delete modal */}
+      {/* Delete group modal */}
+      {deleteGroupTarget && (
+        <DeleteConfirmModal
+          col={deleteGroupTarget}
+          label={deleteGroupTarget.name}
+          onConfirm={() => {
+            deleteGroup(deleteGroupTarget.id);
+            setDeleteGroupTarget(null);
+          }}
+          onCancel={() => setDeleteGroupTarget(null)}
+        />
+      )}
+
+      {/* Delete column modal */}
       {deleteTarget && (
-        <DeleteColModal
+        <DeleteConfirmModal
           col={deleteTarget}
           onConfirm={() => {
             deleteCustomColumn(deleteTarget.id);

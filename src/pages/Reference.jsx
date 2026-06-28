@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
@@ -498,11 +498,29 @@ function RefSection({ section, isFirst, isLast }) {
 
 export default function Reference() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const refSections = useCRMStore((s) => s.refSections) ?? [];
   const addRefSection = useCRMStore((s) => s.addRefSection);
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [showNewSection, setShowNewSection] = useState(false);
   const [sectionError, setSectionError] = useState("");
+
+  const sectionRefs = useRef({});
+
+  useEffect(() => {
+    const action = searchParams.get("action");
+    const sectionId = searchParams.get("section");
+    if (action === "new-section") {
+      setShowNewSection(true);
+      setSearchParams({}, { replace: true });
+    } else if (sectionId) {
+      setTimeout(() => {
+        const el = sectionRefs.current[sectionId];
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const handleAddSection = () => {
     if (!newSectionTitle.trim()) {
@@ -611,12 +629,18 @@ export default function Reference() {
       ) : (
         <div className="space-y-4">
           {refSections.map((sec, i) => (
-            <RefSection
+            <div
               key={sec.id}
-              section={sec}
-              isFirst={i === 0}
-              isLast={i === refSections.length - 1}
-            />
+              ref={(el) => {
+                sectionRefs.current[sec.id] = el;
+              }}
+            >
+              <RefSection
+                section={sec}
+                isFirst={i === 0}
+                isLast={i === refSections.length - 1}
+              />
+            </div>
           ))}
         </div>
       )}

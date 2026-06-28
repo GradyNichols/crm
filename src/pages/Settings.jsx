@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 
 const FIELD_TYPES = [
@@ -70,6 +70,7 @@ function DeleteConfirmModal({ col, label, onConfirm, onCancel }) {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const addCustomColumn = useCRMStore((s) => s.addCustomColumn);
   const deleteCustomColumn = useCRMStore((s) => s.deleteCustomColumn);
@@ -79,11 +80,36 @@ export default function Settings() {
   const [errors, setErrors] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
+
   const [newGroupName, setNewGroupName] = useState("");
   const [groupError, setGroupError] = useState("");
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [editingGroupName, setEditingGroupName] = useState("");
   const [deleteGroupTarget, setDeleteGroupTarget] = useState(null);
+
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "new-group") {
+      setNewGroupName("");
+      setTimeout(
+        () =>
+          document
+            .getElementById("groups-section")
+            ?.scrollIntoView({ behavior: "smooth" }),
+        100,
+      );
+      setSearchParams({}, { replace: true });
+    } else if (action === "new-column") {
+      setTimeout(
+        () =>
+          document
+            .getElementById("columns-section")
+            ?.scrollIntoView({ behavior: "smooth" }),
+        100,
+      );
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const setField = (key, val) => {
     setForm((f) => ({ ...f, [key]: val }));
@@ -160,7 +186,7 @@ export default function Settings() {
       </div>
 
       {/* ── Groups ── */}
-      <section>
+      <section id="groups-section">
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
           Groups ({groups.length})
         </h3>
@@ -279,7 +305,7 @@ export default function Settings() {
 
       {/* ── Custom columns ── */}
       {/* Existing custom columns */}
-      <section>
+      <section id="columns-section">
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
           Custom Columns ({customColumns.length})
         </h3>

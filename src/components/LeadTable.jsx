@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { COLUMNS, STATUS_COLORS, STATUSES } from "../constants";
 import { ICONS } from "../icons";
@@ -42,82 +42,78 @@ function CustomCell({ col, value }) {
   return <span className="text-slate-300">{String(value)}</span>;
 }
 
-// Inline status dropdown
 function StatusCell({ lead }) {
   const updateLead = useCRMStore((s) => s.updateLead);
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [editing, setEditing] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        value={lead.status}
+        onChange={(e) => {
+          updateLead(lead.id, { status: e.target.value });
+          setEditing(false);
+        }}
+        onBlur={() => setEditing(false)}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-slate-800 border border-blue-500 text-slate-100 text-sm rounded-lg px-2 py-0.5 focus:outline-none"
+      >
+        {STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+    );
+  }
 
   return (
-    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={`text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap transition-opacity hover:opacity-80 ${STATUS_COLORS[lead.status] || ""}`}
-      >
-        {lead.status}
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-20 bg-[#0d1117] border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[120px]">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => {
-                updateLead(lead.id, { status: s });
-                setOpen(false);
-              }}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-800 ${
-                lead.status === s ? "text-blue-400" : "text-slate-300"
-              }`}
-            >
-              <span
-                className={`inline-block w-2 h-2 rounded-full mr-2 ${STATUS_COLORS[s]?.split(" ")[0] || "bg-slate-600"}`}
-              />
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <span
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      className={`text-sm px-3 py-1 rounded-full font-medium cursor-pointer hover:opacity-80 transition-opacity whitespace-nowrap ${STATUS_COLORS[lead.status] || ""}`}
+    >
+      {lead.status}
+    </span>
   );
 }
 
-// Notes log display inside expanded row
 function NotesLog({ lead }) {
   const deleteNoteEntry = useCRMStore((s) => s.deleteNoteEntry);
-  const log = lead.notesLog || [];
-  if (log.length === 0)
-    return <p className="text-sm text-slate-700 italic mt-2">No notes yet.</p>;
+  const log = [...(lead.notesLog || [])].reverse();
+  if (!log.length) return null;
   return (
-    <div className="mt-3 space-y-2">
-      <p className="text-xs text-slate-600 uppercase tracking-widest">Notes</p>
-      {[...log].reverse().map((entry) => (
-        <div
-          key={entry.id}
-          className="flex items-start justify-between gap-3 group"
-        >
-          <div className="flex items-start gap-2">
-            <span className="text-slate-700 text-xs mt-0.5 whitespace-nowrap">
-              {entry.ts}
-            </span>
-            <p className="text-sm text-slate-400">{entry.text}</p>
+    <div className="mt-2 space-y-1">
+      {log.map((entry) => (
+        <div key={entry.id} className="flex items-start gap-2 group/note">
+          <div className="flex-1 min-w-0">
+            <span className="text-slate-500 text-xs">{entry.ts} — </span>
+            <span className="text-slate-400 text-xs">{entry.text}</span>
           </div>
           <button
             onClick={(e) => {
               e.stopPropagation();
               deleteNoteEntry(lead.id, entry.id);
             }}
-            className="text-slate-700 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-all shrink-0"
+            className="text-slate-700 hover:text-red-400 opacity-0 group-hover/note:opacity-100 transition-all shrink-0"
           >
-            ×
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18 18 6M6 6l12 12"
+              />
+            </svg>
           </button>
         </div>
       ))}
@@ -186,10 +182,14 @@ export default function LeadTable({ leads, onEdit }) {
   const setSort = useCRMStore((s) => s.setSort);
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const groups = useCRMStore((s) => s.groups) ?? [];
-  const updateLead = useCRMStore((s) => s.updateLead);
   const deleteLead = useCRMStore((s) => s.deleteLead);
+  const updateLead = useCRMStore((s) => s.updateLead);
+
   const [expandedId, setExpandedId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   const allColumns = [
     ...COLUMNS,
@@ -203,6 +203,33 @@ export default function LeadTable({ leads, onEdit }) {
     if (av > bv) return sortDir === "asc" ? 1 : -1;
     return 0;
   });
+
+  const toggleSelect = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const toggleAll = () =>
+    setSelected((prev) =>
+      prev.size === sorted.length
+        ? new Set()
+        : new Set(sorted.map((l) => l.id)),
+    );
+  const clearSelect = () => setSelected(new Set());
+
+  const handleBulkStatus = () => {
+    if (!bulkStatus) return;
+    selected.forEach((id) => updateLead(id, { status: bulkStatus }));
+    clearSelect();
+    setBulkStatus("");
+  };
+
+  const handleBulkDelete = () => {
+    selected.forEach((id) => deleteLead(id));
+    clearSelect();
+    setBulkDeleteConfirm(false);
+  };
 
   const SortIcon = ({ col }) => {
     if (sortKey !== col)
@@ -250,11 +277,21 @@ export default function LeadTable({ leads, onEdit }) {
   return (
     <>
       <div className="rounded-xl border border-slate-800 overflow-hidden">
-        {/* Desktop */}
+        {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-base">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/80">
+                <th className="pl-5 py-4 w-8">
+                  <input
+                    type="checkbox"
+                    checked={
+                      sorted.length > 0 && selected.size === sorted.length
+                    }
+                    onChange={toggleAll}
+                    className="w-4 h-4 accent-blue-500 cursor-pointer"
+                  />
+                </th>
                 {allColumns.map((col) => (
                   <th
                     key={col.key}
@@ -278,8 +315,19 @@ export default function LeadTable({ leads, onEdit }) {
                     onClick={() =>
                       setExpandedId(expandedId === lead.id ? null : lead.id)
                     }
-                    className={`border-b border-slate-800/60 cursor-pointer transition-colors ${i % 2 === 0 ? "bg-slate-900/20" : "bg-transparent"} hover:bg-slate-800/40`}
+                    className={`border-b border-slate-800/60 cursor-pointer transition-colors ${i % 2 === 0 ? "bg-slate-900/20" : "bg-transparent"} hover:bg-slate-800/40 ${selected.has(lead.id) ? "bg-blue-950/20" : ""}`}
                   >
+                    <td
+                      className="pl-5 py-4 w-8"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(lead.id)}
+                        onChange={() => toggleSelect(lead.id)}
+                        className="w-4 h-4 accent-blue-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-5 py-4 font-semibold whitespace-nowrap">
                       <Link
                         to={`/lead/${lead.id}`}
@@ -354,7 +402,7 @@ export default function LeadTable({ leads, onEdit }) {
                       key={`${lead.id}-exp`}
                       className="bg-slate-900/50 border-b border-slate-800/60"
                     >
-                      <td colSpan={allColumns.length + 1} className="px-6 py-4">
+                      <td colSpan={allColumns.length + 3} className="px-6 py-4">
                         <div className="flex flex-wrap gap-5 text-sm text-slate-400 items-center">
                           {lead.phone && (
                             <span>
@@ -425,27 +473,34 @@ export default function LeadTable({ leads, onEdit }) {
           )}
         </div>
 
-        {/* Mobile */}
+        {/* Mobile cards */}
         <div className="md:hidden divide-y divide-slate-800">
           {sorted.map((lead) => (
             <div
               key={lead.id}
-              className="p-5 space-y-2.5 cursor-pointer hover:bg-slate-800/30 transition-colors"
+              className={`p-5 space-y-2.5 cursor-pointer hover:bg-slate-800/30 transition-colors ${selected.has(lead.id) ? "bg-blue-950/20" : ""}`}
               onClick={() =>
                 setExpandedId(expandedId === lead.id ? null : lead.id)
               }
             >
               <div className="flex items-start justify-between gap-2">
-                <Link
-                  to={`/lead/${lead.id}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-slate-100 font-semibold text-base hover:text-blue-400 transition-colors"
-                >
-                  {lead.businessName}
-                </Link>
-                <div onClick={(e) => e.stopPropagation()}>
-                  <StatusCell lead={lead} />
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(lead.id)}
+                    onChange={() => toggleSelect(lead.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 accent-blue-500 cursor-pointer shrink-0"
+                  />
+                  <Link
+                    to={`/lead/${lead.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-slate-100 font-semibold text-base hover:text-blue-400 transition-colors truncate"
+                  >
+                    {lead.businessName}
+                  </Link>
                 </div>
+                <StatusCell lead={lead} />
               </div>
               <div className="flex items-center gap-3">
                 <TypeBadge type={lead.type} />
@@ -487,46 +542,47 @@ export default function LeadTable({ leads, onEdit }) {
                         </p>
                       ),
                   )}
+                  {groups.length > 0 && (
+                    <div
+                      className="flex items-center gap-2 pt-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="text-xs text-slate-600">Group:</span>
+                      <select
+                        value={lead.groupId || ""}
+                        onChange={(e) =>
+                          updateLead(lead.id, {
+                            groupId: e.target.value || null,
+                          })
+                        }
+                        className="bg-slate-800/80 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-blue-500 transition-colors"
+                      >
+                        <option value="">No group</option>
+                        {groups.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <NotesLog lead={lead} />
                   <div
-                    className="pt-2 space-y-2"
+                    className="flex gap-4 pt-2"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {groups.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-600">Group:</span>
-                        <select
-                          value={lead.groupId || ""}
-                          onChange={(e) =>
-                            updateLead(lead.id, {
-                              groupId: e.target.value || null,
-                            })
-                          }
-                          className="bg-slate-800/80 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-blue-500 transition-colors"
-                        >
-                          <option value="">No group</option>
-                          {groups.map((g) => (
-                            <option key={g.id} value={g.id}>
-                              {g.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => onEdit(lead)}
-                        className="text-sm text-blue-400 hover:text-blue-300"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(lead)}
-                        className="text-sm text-red-500 hover:text-red-400"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => onEdit(lead)}
+                      className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(lead)}
+                      className="text-sm text-red-500 hover:text-red-400"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               )}
@@ -540,6 +596,101 @@ export default function LeadTable({ leads, onEdit }) {
         </div>
       </div>
 
+      {/* Bulk toolbar */}
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl px-4 py-3">
+          <span className="text-sm text-slate-400 mr-1 whitespace-nowrap">
+            {selected.size} selected
+          </span>
+          <select
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value)}
+            className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500 transition-colors"
+          >
+            <option value="">Set status…</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleBulkStatus}
+            disabled={!bulkStatus}
+            className="text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Apply
+          </button>
+          <div className="w-px h-5 bg-slate-700 mx-1" />
+          <button
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="text-sm text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg hover:bg-red-950/40 transition-colors"
+          >
+            Delete
+          </button>
+          <button
+            onClick={clearSelect}
+            className="text-slate-600 hover:text-slate-400 transition-colors ml-1 text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Bulk delete confirm */}
+      {bulkDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setBulkDeleteConfirm(false);
+          }}
+        >
+          <div className="w-full max-w-sm bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-full bg-red-950 flex items-center justify-center shrink-0">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 text-red-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-slate-100 font-semibold text-base">
+                  Delete {selected.size} lead{selected.size !== 1 ? "s" : ""}?
+                </h3>
+                <p className="text-slate-500 text-sm mt-0.5">
+                  This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="text-sm font-medium bg-red-700 hover:bg-red-600 text-white px-5 py-2 rounded-lg transition-colors"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single delete confirm */}
       {deleteTarget && (
         <DeleteConfirmModal
           lead={deleteTarget}

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 
 function formatPipeline(leads) {
@@ -84,6 +84,7 @@ function NextStepRow({ text, index }) {
 
 export default function AI() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const leads = useCRMStore((s) => s.leads) ?? [];
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -111,6 +112,18 @@ export default function AI() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      searchParams.get("action") === "analyze" &&
+      !loading &&
+      !result &&
+      leads.length > 0
+    ) {
+      setSearchParams({}, { replace: true });
+      handleAnalyze();
+    }
+  }, [searchParams]);
 
   const isEmpty = leads.length === 0;
 

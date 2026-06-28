@@ -1,12 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS, OUTREACH_TYPES } from "../constants";
 
 const today = new Date().toISOString().slice(0, 10);
 
 function ChecklistItem({ lead, onLog }) {
-  // Derive done from the store — if lastTouchDate is today, it was logged today
   const done = lead.lastTouchDate === today;
   const [expanded, setExpanded] = useState(false);
   const [type, setType] = useState(lead.type || "Phone Call");
@@ -20,22 +19,12 @@ function ChecklistItem({ lead, onLog }) {
 
   return (
     <div
-      className={`rounded-xl border transition-colors ${
-        done
-          ? "border-slate-800/40 bg-slate-900/10 opacity-50"
-          : "border-slate-800 bg-slate-900/30"
-      }`}
+      className={`rounded-xl border transition-colors ${done ? "border-slate-800/40 bg-slate-900/10 opacity-50" : "border-slate-800 bg-slate-900/30"}`}
     >
-      {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3">
-        {/* Checkbox — clicking when undone expands the log form */}
         <button
           onClick={() => (done ? null : setExpanded((e) => !e))}
-          className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-            done
-              ? "bg-green-600 border-green-600"
-              : "border-slate-600 hover:border-blue-400"
-          }`}
+          className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${done ? "bg-green-600 border-green-600" : "border-slate-600 hover:border-blue-400"}`}
         >
           {done && (
             <svg
@@ -54,8 +43,6 @@ function ChecklistItem({ lead, onLog }) {
             </svg>
           )}
         </button>
-
-        {/* Lead info */}
         <div
           className="flex-1 min-w-0 cursor-pointer"
           onClick={() => !done && setExpanded((e) => !e)}
@@ -77,8 +64,6 @@ function ChecklistItem({ lead, onLog }) {
             )}
           </div>
         </div>
-
-        {/* Status badge */}
         <span
           className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${STATUS_COLORS[lead.status] || ""}`}
         >
@@ -86,16 +71,13 @@ function ChecklistItem({ lead, onLog }) {
         </span>
       </div>
 
-      {/* Expanded log form */}
       {expanded && !done && (
         <div className="px-4 pb-4 pt-1 border-t border-slate-800 space-y-3">
-          {/* Latest note preview */}
           {lead.notesLog?.length > 0 && (
             <p className="text-xs text-slate-600 italic">
               Last: "{[...lead.notesLog].reverse()[0].text}"
             </p>
           )}
-
           <div className="flex gap-2">
             <select
               value={type}
@@ -133,9 +115,17 @@ function ChecklistItem({ lead, onLog }) {
 
 export default function Checklist() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const leads = useCRMStore((s) => s.leads) ?? [];
   const logTouchpoint = useCRMStore((s) => s.logTouchpoint);
-  const [filter, setFilter] = useState("due"); // 'due' | 'all'
+  const [filter, setFilter] = useState(() =>
+    searchParams.get("filter") === "all" ? "all" : "due",
+  );
+
+  useEffect(() => {
+    const p = searchParams.get("filter");
+    if (p === "all" || p === "due") setFilter(p);
+  }, [searchParams]);
 
   const dueLeads = leads
     .filter((l) => !["Closed", "Dead"].includes(l.status))
@@ -143,7 +133,6 @@ export default function Checklist() {
       (l) => filter === "all" || (l.followUpDate && l.followUpDate <= today),
     )
     .sort((a, b) => {
-      // Overdue first, then by follow-up date
       if (a.followUpDate && b.followUpDate)
         return a.followUpDate.localeCompare(b.followUpDate);
       if (a.followUpDate) return -1;
@@ -160,7 +149,6 @@ export default function Checklist() {
 
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate("/")}
@@ -195,24 +183,15 @@ export default function Checklist() {
         </div>
       </div>
 
-      {/* Filter toggle */}
       <div className="flex items-center gap-2">
         <button
           onClick={() => setFilter("due")}
-          className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors ${
-            filter === "due"
-              ? "bg-blue-600 text-white"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-          }`}
+          className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors ${filter === "due" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"}`}
         >
           Due today
           {dueCount > 0 && (
             <span
-              className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-                filter === "due"
-                  ? "bg-blue-500 text-white"
-                  : "bg-slate-700 text-slate-300"
-              }`}
+              className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${filter === "due" ? "bg-blue-500 text-white" : "bg-slate-700 text-slate-300"}`}
             >
               {dueCount}
             </span>
@@ -220,17 +199,12 @@ export default function Checklist() {
         </button>
         <button
           onClick={() => setFilter("all")}
-          className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors ${
-            filter === "all"
-              ? "bg-blue-600 text-white"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-          }`}
+          className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors ${filter === "all" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"}`}
         >
           All active
         </button>
       </div>
 
-      {/* List */}
       {dueLeads.length === 0 ? (
         <div className="text-center py-16 space-y-2">
           <p className="text-slate-500 text-base">

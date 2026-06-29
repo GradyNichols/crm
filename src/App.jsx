@@ -288,7 +288,8 @@ function Sidebar({ open, onClose }) {
       >
         {/* Panel header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-          <span className="text-xs font-semibold text-slate-600 uppercase tracking-widest">
+          <img src="../public/logo.png" alt="Logo" className="w-10 h-10" />
+          <span className="text-base font-semibold text-slate-600 uppercase tracking-widest">
             Navigation
           </span>
           <button
@@ -577,6 +578,10 @@ export default function App() {
           >
             <HamburgerIcon />
           </button>
+
+          <div className="px-1 ml-1 mr-2">
+            <img src="../public/logo.png" alt="Logo" className="w-12 h-12" />
+          </div>
 
           {/* Title */}
           <div className="flex-1">

@@ -13,6 +13,39 @@ function StarRating({ value }) {
   );
 }
 
+function Checkbox({ checked, onChange, onClick }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick ? onClick(e) : onChange(!checked);
+      }}
+      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+        checked
+          ? "bg-blue-600 border-blue-600"
+          : "border-slate-600 hover:border-blue-400 bg-transparent"
+      }`}
+    >
+      {checked && (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-2.5 h-2.5 text-white"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={3}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.5 12.75l6 6 9-13.5"
+          />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function TypeBadge({ type }) {
   const colors = {
     "Walk-in": "bg-teal-900/60 text-teal-300",
@@ -283,13 +316,11 @@ export default function LeadTable({ leads, onEdit }) {
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/80">
                 <th className="pl-5 py-4 w-8">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={
                       sorted.length > 0 && selected.size === sorted.length
                     }
                     onChange={toggleAll}
-                    className="w-4 h-4 accent-blue-500 cursor-pointer"
                   />
                 </th>
                 {allColumns.map((col) => (
@@ -321,11 +352,9 @@ export default function LeadTable({ leads, onEdit }) {
                       className="pl-5 py-4 w-8"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selected.has(lead.id)}
                         onChange={() => toggleSelect(lead.id)}
-                        className="w-4 h-4 accent-blue-500 cursor-pointer"
                       />
                     </td>
                     <td className="px-5 py-4 font-semibold whitespace-nowrap">
@@ -485,12 +514,9 @@ export default function LeadTable({ leads, onEdit }) {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selected.has(lead.id)}
                     onChange={() => toggleSelect(lead.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 accent-blue-500 cursor-pointer shrink-0"
                   />
                   <Link
                     to={`/lead/${lead.id}`}

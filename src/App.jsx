@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Routes,
   Route,
+  Link,
   NavLink,
   useLocation,
   useNavigate,
@@ -16,6 +17,7 @@ import Checklist from "./pages/Checklist";
 import Reference from "./pages/Reference";
 import AI from "./pages/AI";
 import LeadDetail from "./pages/LeadDetail";
+import Import from "./pages/Import";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 
@@ -288,10 +290,20 @@ function Sidebar({ open, onClose }) {
       >
         {/* Panel header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-          <img src="../public/logo.png" alt="Logo" className="w-10 h-10" />
-          <span className="text-base font-semibold text-slate-600 uppercase tracking-widest">
-            Navigation
-          </span>
+          <NavLink
+            to="/"
+            onClick={onClose}
+            className="flex items-center gap-2.5"
+          >
+            <img
+              src="/logo.png"
+              alt="Trace logo"
+              className="h-8 w-8 object-contain"
+            />
+            <span className="text-lg font-semibold text-slate-100 tracking-tight">
+              Trace
+            </span>
+          </NavLink>
           <button
             onClick={onClose}
             className="text-slate-600 hover:text-slate-300 transition-colors text-xl leading-none"
@@ -478,6 +490,7 @@ function Dashboard({ onEditLead }) {
   const groups = useCRMStore((s) => s.groups) ?? [];
   const [statusFilter, setStatusFilter] = useState(null);
   const [activeGroup, setActiveGroup] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
 
   const groupFiltered = activeGroup
     ? leads.filter((l) => l.groupId === activeGroup)
@@ -510,29 +523,62 @@ function Dashboard({ onEditLead }) {
             : ""}{" "}
           lead{filteredLeads.length !== 1 ? "s" : ""}
         </p>
-        <button
-          onClick={() => exportCSV(filteredLeads, customColumns)}
-          disabled={filteredLeads.length === 0}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.8}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setSelectMode((s) => !s)}
+            className={`text-sm transition-colors ${selectMode ? "text-blue-400 hover:text-blue-300" : "text-slate-500 hover:text-slate-300"}`}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
-            />
-          </svg>
-          Export CSV
-        </button>
+            {selectMode ? "Cancel" : "Select"}
+          </button>
+          <Link
+            to="/import"
+            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M7.5 7.5 12 3m0 0 4.5 4.5M12 3v13.5"
+              />
+            </svg>
+            Import CSV
+          </Link>
+          <button
+            onClick={() => exportCSV(filteredLeads, customColumns)}
+            disabled={filteredLeads.length === 0}
+            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+            Export CSV
+          </button>
+        </div>
       </div>
-      <LeadTable leads={filteredLeads} onEdit={onEditLead} />
+      <LeadTable
+        leads={filteredLeads}
+        onEdit={onEditLead}
+        selectMode={selectMode}
+        onExitSelect={() => setSelectMode(false)}
+      />
     </main>
   );
 }
@@ -569,44 +615,47 @@ export default function App() {
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <header className="border-b border-slate-800 bg-[#03060f]/90 sticky top-0 z-30 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
-          {/* Hamburger — always left of title */}
-          <button
-            onClick={() => setSidebarOpen((o) => !o)}
-            className="p-2.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors shrink-0"
-            title="Menu"
-          >
-            <HamburgerIcon />
-          </button>
-
-          <div className="px-1 ml-1 mr-2">
-            <img src="../public/logo.png" alt="Logo" className="w-12 h-12" />
-          </div>
-
-          {/* Title */}
-          <div className="flex-1">
-            <NavLink to="/">
-              <h1 className="text-xl font-semibold text-slate-100 tracking-tight hover:text-blue-400 transition-colors">
-                Restaurant CRM
-              </h1>
-            </NavLink>
-            <p className="text-sm text-slate-600 mt-0.5 hidden sm:block">
-              Last updated {lastUpdated}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center">
+          {/* Left — hamburger + last updated */}
+          <div className="flex-1 flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen((o) => !o)}
+              className="p-2.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors shrink-0"
+              title="Menu"
+            >
+              <HamburgerIcon />
+            </button>
+            <p className="text-sm text-slate-600 hidden sm:block">
+              {lastUpdated}
             </p>
           </div>
 
-          {/* Add Lead — only on dashboard */}
-          {isDashboard && (
-            <button
-              onClick={() => {
-                setEditingLead(null);
-                setShowModal(true);
-              }}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-sm sm:text-base font-medium px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg transition-colors"
-            >
-              + Add Lead
-            </button>
-          )}
+          {/* Center — logo */}
+          <NavLink to="/" className="flex items-center gap-2.5 shrink-0">
+            <img
+              src="/logo.png"
+              alt="Trace logo"
+              className="h-8 w-8 object-contain"
+            />
+            <span className="text-xl font-semibold text-slate-100 tracking-tight">
+              Trace
+            </span>
+          </NavLink>
+
+          {/* Right — Add Lead (desktop only) */}
+          <div className="flex-1 flex items-center justify-end gap-3">
+            {isDashboard && (
+              <button
+                onClick={() => {
+                  setEditingLead(null);
+                  setShowModal(true);
+                }}
+                className="hidden sm:flex bg-blue-600 hover:bg-blue-500 text-white text-base font-medium px-5 py-2.5 rounded-lg transition-colors"
+              >
+                + Add Lead
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -618,7 +667,35 @@ export default function App() {
         <Route path="/reference" element={<Reference />} />
         <Route path="/ai" element={<AI />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
+        <Route path="/import" element={<Import />} />
       </Routes>
+
+      {/* Mobile FAB — only on dashboard */}
+      {isDashboard && (
+        <button
+          onClick={() => {
+            setEditingLead(null);
+            setShowModal(true);
+          }}
+          className="sm:hidden fixed bottom-6 right-6 z-30 w-14 h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+          title="Add Lead"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-7 h-7"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4.5v15m7.5-7.5h-15"
+            />
+          </svg>
+        </button>
+      )}
 
       {showModal && (
         <LeadModal

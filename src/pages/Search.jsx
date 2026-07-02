@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS } from "../constants";
 
@@ -104,9 +104,10 @@ export default function Search() {
           {results.length > 0 && (
             <div className="rounded-xl border border-slate-800 overflow-hidden divide-y divide-slate-800">
               {results.map((lead) => (
-                <div
+                <Link
                   key={lead.id}
-                  className="px-5 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
+                  to={`/lead/${lead.id}`}
+                  className="block px-5 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1 min-w-0">
@@ -152,7 +153,7 @@ export default function Search() {
                       </span>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

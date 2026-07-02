@@ -1,6 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { COLUMNS, STATUS_COLORS, STATUSES } from "../constants";
+import {
+  COLUMNS,
+  STATUS_COLORS,
+  STATUSES,
+  isAging,
+  daysSinceTouch,
+} from "../constants";
 import { ICONS } from "../icons";
 import useCRMStore from "../store/useCRMStore";
 
@@ -43,6 +49,19 @@ function Checkbox({ checked, onChange, onClick }) {
         </svg>
       )}
     </button>
+  );
+}
+
+function AgingDot({ lead }) {
+  if (!isAging(lead)) return null;
+  const days = daysSinceTouch(lead);
+  const label =
+    days === null ? "Never contacted" : `${days} days without contact`;
+  return (
+    <span
+      className="inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse"
+      title={label}
+    />
   );
 }
 
@@ -209,7 +228,12 @@ function DeleteConfirmModal({ lead, onConfirm, onCancel }) {
   );
 }
 
-export default function LeadTable({ leads, onEdit }) {
+export default function LeadTable({
+  leads,
+  onEdit,
+  selectMode = false,
+  onExitSelect,
+}) {
   const sortKey = useCRMStore((s) => s.sortKey);
   const sortDir = useCRMStore((s) => s.sortDir);
   const setSort = useCRMStore((s) => s.setSort);
@@ -219,10 +243,26 @@ export default function LeadTable({ leads, onEdit }) {
   const updateLead = useCRMStore((s) => s.updateLead);
 
   const [expandedId, setExpandedId] = useState(null);
+
+  // Clear selection when select mode is turned off
+  useEffect(() => {
+    if (!selectMode) {
+      setSelected(new Set());
+      setBulkStatus("");
+    }
+  }, [selectMode]);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
+  // Clear selection when select mode is turned off
+  useEffect(() => {
+    if (!selectMode) {
+      setSelected(new Set());
+      setBulkStatus("");
+    }
+  }, [selectMode]);
 
   const allColumns = [
     ...COLUMNS,
@@ -262,6 +302,7 @@ export default function LeadTable({ leads, onEdit }) {
     selected.forEach((id) => deleteLead(id));
     clearSelect();
     setBulkDeleteConfirm(false);
+    onExitSelect?.();
   };
 
   const SortIcon = ({ col }) => {
@@ -315,14 +356,16 @@ export default function LeadTable({ leads, onEdit }) {
           <table className="w-full text-base">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/80">
-                <th className="pl-5 py-4 w-8">
-                  <Checkbox
-                    checked={
-                      sorted.length > 0 && selected.size === sorted.length
-                    }
-                    onChange={toggleAll}
-                  />
-                </th>
+                {selectMode && (
+                  <th className="pl-5 py-4 w-8">
+                    <Checkbox
+                      checked={
+                        sorted.length > 0 && selected.size === sorted.length
+                      }
+                      onChange={toggleAll}
+                    />
+                  </th>
+                )}
                 {allColumns.map((col) => (
                   <th
                     key={col.key}
@@ -348,23 +391,28 @@ export default function LeadTable({ leads, onEdit }) {
                     }
                     className={`border-b border-slate-800/60 cursor-pointer transition-colors ${i % 2 === 0 ? "bg-slate-900/20" : "bg-transparent"} hover:bg-slate-800/40 ${selected.has(lead.id) ? "bg-blue-950/20" : ""}`}
                   >
-                    <td
-                      className="pl-5 py-4 w-8"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Checkbox
-                        checked={selected.has(lead.id)}
-                        onChange={() => toggleSelect(lead.id)}
-                      />
-                    </td>
-                    <td className="px-5 py-4 font-semibold whitespace-nowrap">
-                      <Link
-                        to={`/lead/${lead.id}`}
+                    {selectMode && (
+                      <td
+                        className="pl-5 py-4 w-8"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-slate-100 hover:text-blue-400 transition-colors"
                       >
-                        {lead.businessName}
-                      </Link>
+                        <Checkbox
+                          checked={selected.has(lead.id)}
+                          onChange={() => toggleSelect(lead.id)}
+                        />
+                      </td>
+                    )}
+                    <td className="px-5 py-4 font-semibold whitespace-nowrap">
+                      <span className="flex items-center gap-2">
+                        <Link
+                          to={`/lead/${lead.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-slate-100 hover:text-blue-400 transition-colors"
+                        >
+                          {lead.businessName}
+                        </Link>
+                        <AgingDot lead={lead} />
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-slate-400 whitespace-nowrap">
                       {lead.ownerName || (
@@ -431,7 +479,10 @@ export default function LeadTable({ leads, onEdit }) {
                       key={`${lead.id}-exp`}
                       className="bg-slate-900/50 border-b border-slate-800/60"
                     >
-                      <td colSpan={allColumns.length + 3} className="px-6 py-4">
+                      <td
+                        colSpan={allColumns.length + (selectMode ? 3 : 2)}
+                        className="px-6 py-4"
+                      >
                         <div className="flex flex-wrap gap-5 text-sm text-slate-400 items-center">
                           {lead.phone && (
                             <span>
@@ -514,17 +565,24 @@ export default function LeadTable({ leads, onEdit }) {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Checkbox
-                    checked={selected.has(lead.id)}
-                    onChange={() => toggleSelect(lead.id)}
-                  />
-                  <Link
-                    to={`/lead/${lead.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-slate-100 font-semibold text-base hover:text-blue-400 transition-colors truncate"
-                  >
-                    {lead.businessName}
-                  </Link>
+                  {selectMode && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selected.has(lead.id)}
+                        onChange={() => toggleSelect(lead.id)}
+                      />
+                    </div>
+                  )}
+                  <span className="flex items-center gap-2 min-w-0">
+                    <Link
+                      to={`/lead/${lead.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-slate-100 font-semibold text-base hover:text-blue-400 transition-colors truncate"
+                    >
+                      {lead.businessName}
+                    </Link>
+                    <AgingDot lead={lead} />
+                  </span>
                 </div>
                 <StatusCell lead={lead} />
               </div>
@@ -623,7 +681,7 @@ export default function LeadTable({ leads, onEdit }) {
       </div>
 
       {/* Bulk toolbar */}
-      {selected.size > 0 && (
+      {selectMode && selected.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl px-4 py-3">
           <span className="text-sm text-slate-400 mr-1 whitespace-nowrap">
             {selected.size} selected
@@ -655,7 +713,10 @@ export default function LeadTable({ leads, onEdit }) {
             Delete
           </button>
           <button
-            onClick={clearSelect}
+            onClick={() => {
+              clearSelect();
+              onExitSelect?.();
+            }}
             className="text-slate-600 hover:text-slate-400 transition-colors ml-1 text-lg leading-none"
           >
             ×

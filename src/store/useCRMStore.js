@@ -46,6 +46,18 @@ const useCRMStore = create(
         }));
       },
 
+      addLeadsBulk: (newLeads) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const prepared = newLeads.map((lead) => {
+          const notesLog = lead.notes
+            ? [{ id: id("n"), text: lead.notes, ts: today }]
+            : [];
+          const { notes, ...rest } = lead;
+          return { ...rest, notesLog, id: id("lead") };
+        });
+        set((s) => ({ leads: [...s.leads, ...prepared] }));
+      },
+
       updateLead: (leadId, updates) => {
         set((s) => ({
           leads: s.leads.map((l) => {

@@ -255,6 +255,14 @@ const useCRMStore = create(
           }),
         }));
       },
+
+      // ── Geocache ────────────────────────────────────────────────────────────
+      // Stores { address: { lat, lng } } to avoid re-geocoding the same address
+      geocache: {},
+
+      setGeocode: (address, coords) => {
+        set((s) => ({ geocache: { ...s.geocache, [address]: coords } }));
+      },
     }),
     {
       name: "crm_leads",
@@ -265,6 +273,7 @@ const useCRMStore = create(
         sortKey: s.sortKey,
         sortDir: s.sortDir,
         refSections: s.refSections,
+        geocache: s.geocache,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -272,6 +281,7 @@ const useCRMStore = create(
         leads: (persisted.leads || []).map(migrateNotes),
         groups: persisted.groups || [],
         refSections: persisted.refSections || [],
+        geocache: persisted.geocache || {},
       }),
     },
   ),

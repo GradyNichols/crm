@@ -415,6 +415,28 @@ function Sidebar({ open, onClose }) {
               },
             ]}
           />
+          {/* Keyboard shortcuts hint */}
+          <div className="mt-3 px-2 py-3 rounded-lg bg-slate-900/40 border border-slate-800">
+            <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">
+              Shortcuts
+            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              {[
+                ["N", "New lead"],
+                ["/", "Search"],
+                ["C", "Checklist"],
+                ["M", "Map"],
+                ["R", "Reference"],
+              ].map(([key, label]) => (
+                <div key={key} className="flex items-center gap-1.5">
+                  <kbd className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                    {key}
+                  </kbd>
+                  <span className="text-xs text-slate-600">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </>
@@ -666,6 +688,48 @@ export default function App() {
     setShowModal(false);
     setEditingLead(null);
   };
+  const navigate = useNavigate();
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      // Don't fire when typing in inputs
+      const tag = document.activeElement?.tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      // Don't fire when modal or sidebar is open
+      if (showModal || sidebarOpen) return;
+
+      switch (e.key) {
+        case "n":
+        case "N":
+          e.preventDefault();
+          setEditingLead(null);
+          setShowModal(true);
+          break;
+        case "/":
+          e.preventDefault();
+          navigate("/search");
+          break;
+        case "c":
+        case "C":
+          e.preventDefault();
+          navigate("/checklist");
+          break;
+        case "m":
+        case "M":
+          e.preventDefault();
+          navigate("/map");
+          break;
+        case "r":
+        case "R":
+          e.preventDefault();
+          navigate("/reference");
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showModal, sidebarOpen]);
 
   const now = new Date();
   const lastUpdated = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;

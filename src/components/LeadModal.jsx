@@ -49,10 +49,36 @@ export default function LeadModal({ onClose, onSave, existing }) {
     return () => window.removeEventListener("keydown", handler);
   }, [dirty]);
 
+  const FOLLOWUP_DAYS = {
+    Warm: 3,
+    Contacted: 7,
+    Waiting: 5,
+    Cold: 14,
+  };
+
   const set = (key, val) => {
     setForm((f) => ({ ...f, [key]: val }));
     setErrors((e) => ({ ...e, [key]: undefined }));
     setDirty(true);
+  };
+
+  const handleStatusChange = (status) => {
+    const updates = { status };
+    if (status === "Dead" || status === "Closed") {
+      // Clear follow-up date for terminal statuses
+      updates.followUpDate = "";
+    } else if (FOLLOWUP_DAYS[status]) {
+      const days = FOLLOWUP_DAYS[status];
+      const suggested = new Date();
+      suggested.setDate(suggested.getDate() + days);
+      const suggestedStr = suggested.toISOString().slice(0, 10);
+      // Only auto-fill if empty or suggested date is sooner
+      const current = form.followUpDate;
+      if (!current || suggestedStr < current) {
+        updates.followUpDate = suggestedStr;
+      }
+    }
+    Object.entries(updates).forEach(([k, v]) => set(k, v));
   };
 
   const validate = () => {
@@ -167,7 +193,7 @@ export default function LeadModal({ onClose, onSave, existing }) {
             <Field label="Status" required error={errors.status}>
               <select
                 value={form.status}
-                onChange={(e) => set("status", e.target.value)}
+                onChange={(e) => handleStatusChange(e.target.value)}
                 className={inputClass(errors.status)}
               >
                 {STATUSES.map((s) => (
@@ -229,6 +255,11 @@ export default function LeadModal({ onClose, onSave, existing }) {
                 onChange={(e) => set("followUpDate", e.target.value)}
                 className={inputClass()}
               />
+              {form.followUpDate && (
+                <p className="text-xs text-slate-700 mt-0.5">
+                  Auto-suggested based on status. Override anytime.
+                </p>
+              )}
             </Field>
           </div>
 

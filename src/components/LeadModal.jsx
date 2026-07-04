@@ -13,7 +13,7 @@ const EMPTY_FORM = {
   status: "Cold",
   lastTouchDate: "",
   followUpDate: "",
-  notes: "", // used as "new note to append"
+  notes: "",
   groupId: null,
 };
 
@@ -23,7 +23,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
 
   const buildForm = () => {
     if (!existing) return { ...EMPTY_FORM };
-    // Strip notesLog — we only show add-note field in modal
     const { notesLog, ...rest } = existing;
     return { ...EMPTY_FORM, ...rest, notes: "" };
   };
@@ -31,18 +30,29 @@ export default function LeadModal({ onClose, onSave, existing }) {
   const [form, setForm] = useState(buildForm);
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  const handleClose = () => {
+    if (dirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  };
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [dirty]);
 
   const set = (key, val) => {
     setForm((f) => ({ ...f, [key]: val }));
     setErrors((e) => ({ ...e, [key]: undefined }));
+    setDirty(true);
   };
 
   const validate = () => {
@@ -70,24 +80,26 @@ export default function LeadModal({ onClose, onSave, existing }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm pt-8 px-4 pb-8 overflow-y-auto"
+      className={`fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm pt-8 px-4 pb-8 ${confirmDiscard ? "overflow-hidden" : "overflow-y-auto"}`}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !confirmDiscard) handleClose();
       }}
     >
       <div className="w-full max-w-xl bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl">
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h2 className="text-base font-semibold text-slate-100">
             {existing ? "Edit Lead" : "Add Lead"}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-slate-500 hover:text-slate-300 text-xl leading-none"
           >
             ×
           </button>
         </div>
 
+        {/* Body */}
         <div className="px-6 py-5 space-y-4">
           <Field label="Business Name" required error={errors.businessName}>
             <input
@@ -239,7 +251,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
             )}
           </Field>
 
-          {/* Custom fields */}
           {customColumns.length > 0 && (
             <div className="border-t border-slate-800 pt-4 space-y-4">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -258,9 +269,10 @@ export default function LeadModal({ onClose, onSave, existing }) {
           )}
         </div>
 
+        {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
           >
             Cancel
@@ -272,6 +284,59 @@ export default function LeadModal({ onClose, onSave, existing }) {
             {saved ? "✓ Saved" : existing ? "Save Changes" : "Add Lead"}
           </button>
         </div>
+
+        {/* Discard changes overlay */}
+        {confirmDiscard && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setConfirmDiscard(false);
+            }}
+          >
+            <div className="bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl p-6 mx-4 w-full max-w-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-full bg-amber-950 flex items-center justify-center shrink-0">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-5 h-5 text-amber-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-slate-100 font-semibold text-base">
+                    Discard changes?
+                  </h3>
+                  <p className="text-slate-500 text-sm mt-0.5">
+                    Your unsaved changes will be lost.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end mt-6">
+                <button
+                  onClick={() => setConfirmDiscard(false)}
+                  className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                  Keep editing
+                </button>
+                <button
+                  onClick={onClose}
+                  className="text-sm font-medium bg-amber-700 hover:bg-amber-600 text-white px-5 py-2 rounded-lg transition-colors"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

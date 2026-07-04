@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
-import { STATUS_COLORS, OUTREACH_TYPES, STATUSES } from "../constants";
+import { STATUS_COLORS, STATUSES, OUTREACH_TYPES } from "../constants";
 import LeadModal from "../components/LeadModal";
 
 function StarRating({ value }) {
@@ -25,12 +25,102 @@ function Field({ label, value }) {
   );
 }
 
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
+function CallTimer({ onLog }) {
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const intervalRef = useRef(null);
+
+  const start = () => {
+    setRunning(true);
+    setElapsed(0);
+    intervalRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+  };
+
+  const stop = () => {
+    clearInterval(intervalRef.current);
+    setRunning(false);
+    if (elapsed > 0) onLog(elapsed);
+    setElapsed(0);
+  };
+
+  const cancel = () => {
+    clearInterval(intervalRef.current);
+    setRunning(false);
+    setElapsed(0);
+  };
+
+  useEffect(() => () => clearInterval(intervalRef.current), []);
+
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${
+        running
+          ? "border-red-900/60 bg-red-950/20"
+          : "border-slate-800 bg-slate-900/20"
+      }`}
+    >
+      {/* Timer icon */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className={`w-4 h-4 shrink-0 ${running ? "text-red-400" : "text-slate-600"}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.8}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        />
+      </svg>
+
+      {running ? (
+        <>
+          <span className="text-red-400 font-mono text-sm font-medium tabular-nums min-w-[3.5rem]">
+            {formatDuration(elapsed)}
+          </span>
+          <button
+            onClick={stop}
+            className="text-xs font-medium bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded-lg transition-colors"
+          >
+            Stop & Log
+          </button>
+          <button
+            onClick={cancel}
+            className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            Cancel
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="text-slate-600 text-sm">Call timer</span>
+          <button
+            onClick={start}
+            className="text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1 rounded-lg transition-colors"
+          >
+            Start
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const leads = useCRMStore((s) => s.leads) ?? [];
-  const groups = useCRMStore((s) => s.groups) ?? [];
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
+  const groups = useCRMStore((s) => s.groups) ?? [];
   const updateLead = useCRMStore((s) => s.updateLead);
   const deleteNoteEntry = useCRMStore((s) => s.deleteNoteEntry);
   const logTouchpoint = useCRMStore((s) => s.logTouchpoint);
@@ -60,6 +150,16 @@ export default function LeadDetail() {
     if (!note.trim()) return;
     logTouchpoint(lead.id, { type: noteType, note });
     setNote("");
+    setNoteAdded(true);
+    setTimeout(() => setNoteAdded(false), 2000);
+  };
+
+  const handleTimerLog = (seconds) => {
+    const duration = formatDuration(seconds);
+    logTouchpoint(lead.id, {
+      type: "Phone Call",
+      note: `Call duration: ${duration}`,
+    });
     setNoteAdded(true);
     setTimeout(() => setNoteAdded(false), 2000);
   };
@@ -161,11 +261,16 @@ export default function LeadDetail() {
             </section>
           )}
 
-        {/* Add note */}
+        {/* Log a Touchpoint */}
         <section className="space-y-3">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
             Log a Touchpoint
           </p>
+
+          {/* Call timer */}
+          <CallTimer onLog={handleTimerLog} />
+
+          {/* Manual note */}
           <div className="flex gap-2">
             <select
               value={noteType}
@@ -212,7 +317,6 @@ export default function LeadDetail() {
               </span>
             )}
           </p>
-
           {notesLog.length === 0 ? (
             <div className="rounded-xl border border-slate-800 bg-slate-900/20 px-5 py-8 text-center">
               <p className="text-slate-700 text-sm">
@@ -233,7 +337,6 @@ export default function LeadDetail() {
                   <button
                     onClick={() => deleteNoteEntry(lead.id, entry.id)}
                     className="text-slate-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0 mt-0.5"
-                    title="Delete note"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

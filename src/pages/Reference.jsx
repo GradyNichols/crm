@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import EmptyState from "../components/EmptyState";
 import useCRMStore from "../store/useCRMStore";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
@@ -617,15 +618,15 @@ export default function Reference() {
 
       {/* Sections */}
       {refSections.length === 0 && !showNewSection ? (
-        <div className="text-center py-20 space-y-3">
-          <p className="text-slate-600 text-base">No sections yet.</p>
-          <button
-            onClick={() => setShowNewSection(true)}
-            className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            Create your first section →
-          </button>
-        </div>
+        <EmptyState
+          type="reference"
+          title="No sections yet"
+          subtitle="Create sections like Pitch Scripts, Objection Responses, or Follow-up Rules."
+          action={{
+            label: "Create your first section",
+            onClick: () => setShowNewSection(true),
+          }}
+        />
       ) : (
         <div className="space-y-4">
           {refSections.map((sec, i) => (

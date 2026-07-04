@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import EmptyState from "../components/EmptyState";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS } from "../constants";
 
@@ -161,9 +162,11 @@ export default function Search() {
       )}
 
       {q.length === 0 && (
-        <div className="text-center py-16 text-slate-700 text-sm">
-          Start typing to search your leads.
-        </div>
+        <EmptyState
+          type="search"
+          title="Search your leads"
+          subtitle="Search by name, phone, email, status, notes and more."
+        />
       )}
     </main>
   );

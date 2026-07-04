@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import useCRMStore from "../store/useCRMStore";
-import { STATUS_COLORS } from "../constants";
+import EmptyState from "../components/EmptyState";
+import { STATUS_COLORS, STATUSES } from "../constants";
 
 // ── Pin colors by status ────────────────────────────────────────────────────────
 const PIN_COLORS = {
@@ -62,6 +63,7 @@ export default function Map() {
   const leads = useCRMStore((s) => s.leads) ?? [];
   const geocache = useCRMStore((s) => s.geocache) ?? {};
   const setGeocode = useCRMStore((s) => s.setGeocode);
+  const updateLead = useCRMStore((s) => s.updateLead);
   const [statusFilter, setStatusFilter] = useState("all");
   const [geocoding, setGeocoding] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -210,14 +212,11 @@ export default function Map() {
       {/* Empty state */}
       {leadsWithAddress.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-2">
-            <p className="text-slate-500 text-base">
-              No leads with addresses yet.
-            </p>
-            <p className="text-slate-700 text-sm">
-              Add addresses to your leads to plot them on the map.
-            </p>
-          </div>
+          <EmptyState
+            type="map"
+            title="No addresses to plot"
+            subtitle="Add addresses to your leads and they'll appear on the map."
+          />
         </div>
       )}
 
@@ -275,9 +274,22 @@ export default function Map() {
                       {lead.address && (
                         <p className="text-slate-600 text-xs">{lead.address}</p>
                       )}
+                      <select
+                        value={lead.status}
+                        onChange={(e) =>
+                          updateLead(lead.id, { status: e.target.value })
+                        }
+                        className="w-full mt-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                      >
+                        {STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
                       <button
                         onClick={() => navigate(`/lead/${lead.id}`)}
-                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1"
+                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1 block"
                       >
                         View lead →
                       </button>

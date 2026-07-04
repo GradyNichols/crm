@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import useCRMStore from "./store/useCRMStore";
 import SummaryBar from "./components/SummaryBar";
+import EmptyState from "./components/EmptyState";
 import LeadTable from "./components/LeadTable";
 import LeadModal from "./components/LeadModal";
 import Settings from "./pages/Settings";
@@ -477,33 +478,57 @@ function exportCSV(leads, customColumns) {
 
 // ── Group tabs ───────────────────────────────────────────────────────────────────
 
-function GroupTabs({ groups, activeGroup, onChange }) {
+function GroupTabs({ groups, leads, activeGroup, onChange }) {
   if (groups.length === 0) return null;
+  const countAll = leads.length;
+  const countFor = (id) => leads.filter((l) => l.groupId === id).length;
   return (
     <div className="flex items-center gap-1 mb-5 overflow-x-auto pb-1">
       <button
         onClick={() => onChange(null)}
-        className={`text-sm px-4 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 ${
+        className={`flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 ${
           activeGroup === null
             ? "bg-blue-600 text-white"
             : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
         }`}
       >
         All
-      </button>
-      {groups.map((g) => (
-        <button
-          key={g.id}
-          onClick={() => onChange(g.id === activeGroup ? null : g.id)}
-          className={`text-sm px-4 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 ${
-            activeGroup === g.id
-              ? "bg-blue-600 text-white"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+        <span
+          className={`text-xs px-1.5 py-0.5 rounded-full tabular-nums ${
+            activeGroup === null
+              ? "bg-blue-500 text-white"
+              : "bg-slate-700 text-slate-400"
           }`}
         >
-          {g.name}
-        </button>
-      ))}
+          {countAll}
+        </span>
+      </button>
+      {groups.map((g) => {
+        const count = countFor(g.id);
+        const active = activeGroup === g.id;
+        return (
+          <button
+            key={g.id}
+            onClick={() => onChange(g.id === activeGroup ? null : g.id)}
+            className={`flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors shrink-0 ${
+              active
+                ? "bg-blue-600 text-white"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            }`}
+          >
+            {g.name}
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full tabular-nums ${
+                active
+                  ? "bg-blue-500 text-white"
+                  : "bg-slate-700 text-slate-400"
+              }`}
+            >
+              {count}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -529,6 +554,7 @@ function Dashboard({ onEditLead }) {
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       <GroupTabs
         groups={groups}
+        leads={leads}
         activeGroup={activeGroup}
         onChange={(g) => {
           setActiveGroup(g);
@@ -599,12 +625,20 @@ function Dashboard({ onEditLead }) {
           </button>
         </div>
       </div>
-      <LeadTable
-        leads={filteredLeads}
-        onEdit={onEditLead}
-        selectMode={selectMode}
-        onExitSelect={() => setSelectMode(false)}
-      />
+      {activeGroup && groupFiltered.length === 0 ? (
+        <EmptyState
+          type="group"
+          title="No leads in this group"
+          subtitle="Assign leads to this group by expanding a row and selecting it from the group dropdown."
+        />
+      ) : (
+        <LeadTable
+          leads={filteredLeads}
+          onEdit={onEditLead}
+          selectMode={selectMode}
+          onExitSelect={() => setSelectMode(false)}
+        />
+      )}
     </main>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from "../constants";
 import { ICONS } from "../icons";
 import useCRMStore from "../store/useCRMStore";
+import EmptyState from "./EmptyState";
 
 function StarRating({ value }) {
   return (
@@ -245,18 +246,12 @@ export default function LeadTable({
   const [expandedId, setExpandedId] = useState(null);
 
   // Clear selection when select mode is turned off
-  useEffect(() => {
-    if (!selectMode) {
-      setSelected(new Set());
-      setBulkStatus("");
-    }
-  }, [selectMode]);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [undoToast, setUndoToast] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
-  // Clear selection when select mode is turned off
   useEffect(() => {
     if (!selectMode) {
       setSelected(new Set());
@@ -467,7 +462,16 @@ export default function LeadTable({
                         Edit
                       </button>
                       <button
-                        onClick={() => setDeleteTarget(lead)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const snapshot = { ...lead };
+                          deleteLead(lead.id);
+                          const timer = setTimeout(
+                            () => setUndoToast(null),
+                            4000,
+                          );
+                          setUndoToast({ lead: snapshot, timer });
+                        }}
                         className="text-sm text-slate-600 hover:text-red-400 transition-colors"
                       >
                         Delete
@@ -547,9 +551,11 @@ export default function LeadTable({
             </tbody>
           </table>
           {leads.length === 0 && (
-            <div className="text-center py-16 text-slate-600 text-base">
-              No leads yet — add your first one.
-            </div>
+            <EmptyState
+              type="leads"
+              title="No leads yet"
+              subtitle="Add your first restaurant lead to get started tracking your outreach."
+            />
           )}
         </div>
 
@@ -662,7 +668,16 @@ export default function LeadTable({
                       Edit
                     </button>
                     <button
-                      onClick={() => setDeleteTarget(lead)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const snapshot = { ...lead };
+                        deleteLead(lead.id);
+                        const timer = setTimeout(
+                          () => setUndoToast(null),
+                          4000,
+                        );
+                        setUndoToast({ lead: snapshot, timer });
+                      }}
                       className="text-sm text-red-500 hover:text-red-400"
                     >
                       Delete
@@ -672,11 +687,6 @@ export default function LeadTable({
               )}
             </div>
           ))}
-          {leads.length === 0 && (
-            <div className="text-center py-12 text-slate-600 text-base">
-              No leads yet — add your first one.
-            </div>
-          )}
         </div>
       </div>
 
@@ -778,15 +788,29 @@ export default function LeadTable({
       )}
 
       {/* Single delete confirm */}
-      {deleteTarget && (
-        <DeleteConfirmModal
-          lead={deleteTarget}
-          onConfirm={() => {
-            deleteLead(deleteTarget.id);
-            setDeleteTarget(null);
-          }}
-          onCancel={() => setDeleteTarget(null)}
-        />
+      {/* Undo toast */}
+      {undoToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl px-4 py-3">
+          <span className="text-sm text-slate-300">
+            Deleted{" "}
+            <span className="text-slate-100 font-medium">
+              {undoToast.lead.businessName}
+            </span>
+          </span>
+          <button
+            onClick={() => {
+              clearTimeout(undoToast.timer);
+              // Restore lead with original ID directly into store state
+              useCRMStore.setState((s) => ({
+                leads: [undoToast.lead, ...s.leads],
+              }));
+              setUndoToast(null);
+            }}
+            className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors whitespace-nowrap"
+          >
+            Undo
+          </button>
+        </div>
       )}
     </>
   );

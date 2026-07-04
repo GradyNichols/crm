@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS, OUTREACH_TYPES } from "../constants";
+import EmptyState from "../components/EmptyState";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -206,19 +207,23 @@ export default function Checklist() {
       </div>
 
       {dueLeads.length === 0 ? (
-        <div className="text-center py-16 space-y-2">
-          <p className="text-slate-500 text-base">
-            {filter === "due" ? "No follow-ups due today." : "No active leads."}
-          </p>
-          {filter === "due" && (
-            <button
-              onClick={() => setFilter("all")}
-              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              View all active leads →
-            </button>
-          )}
-        </div>
+        <EmptyState
+          type="checklist"
+          title={filter === "due" ? "All caught up!" : "No active leads"}
+          subtitle={
+            filter === "due"
+              ? "No follow-ups are due today."
+              : "Add some leads to start tracking outreach."
+          }
+          action={
+            filter === "due"
+              ? {
+                  label: "View all active leads",
+                  onClick: () => setFilter("all"),
+                }
+              : undefined
+          }
+        />
       ) : (
         <div className="space-y-2">
           {dueLeads.map((lead) => (

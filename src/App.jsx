@@ -19,7 +19,7 @@ import Reference from "./pages/Reference";
 import AI from "./pages/AI";
 import LeadDetail from "./pages/LeadDetail";
 import Import from "./pages/Import";
-import Map from "./pages/Map";
+import Map from "./pages/MapPage";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 

@@ -687,6 +687,15 @@ export default function LeadTable({
               )}
             </div>
           ))}
+          {leads.length === 0 && (
+            <div className="md:hidden">
+              <EmptyState
+                type="leads"
+                title="No leads yet"
+                subtitle="Add your first restaurant lead to get started tracking your outreach."
+              />
+            </div>
+          )}
         </div>
       </div>
 

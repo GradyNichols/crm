@@ -6,6 +6,7 @@ import {
   NavLink,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from "react-router-dom";
 import useCRMStore from "./store/useCRMStore";
 import SummaryBar from "./components/SummaryBar";
@@ -20,6 +21,7 @@ import AI from "./pages/AI";
 import LeadDetail from "./pages/LeadDetail";
 import Import from "./pages/Import";
 import Map from "./pages/MapPage";
+import LeadSpree from "./pages/LeadSpree";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 
@@ -163,6 +165,38 @@ const MapIcon = () => (
     />
   </svg>
 );
+
+const HomeIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
+    />
+  </svg>
+);
+
+function BottomNavItem({ path, icon, label, currentPath, navigate }) {
+  const active = currentPath === path;
+  return (
+    <button
+      onClick={() => navigate(path)}
+      className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-5 transition-colors ${
+        active ? "text-blue-400" : "text-slate-500 hover:text-slate-300"
+      }`}
+    >
+      {icon}
+      <span className="text-xs font-medium">{label}</span>
+    </button>
+  );
+}
 
 // ── Sidebar nav item ─────────────────────────────────────────────────────────────
 
@@ -333,12 +367,15 @@ function Sidebar({ open, onClose }) {
 
         {/* Nav items */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <SidebarNavItem
-            label="Dashboard"
-            icon={<DashboardIcon />}
-            active={path === "/"}
-            onClick={() => go("/")}
-          />
+          {/* Dashboard — desktop only (mobile has bottom nav) */}
+          <div className="hidden sm:block">
+            <SidebarNavItem
+              label="Dashboard"
+              icon={<DashboardIcon />}
+              active={path === "/"}
+              onClick={() => go("/")}
+            />
+          </div>
           <SidebarNavItem
             label="Checklist"
             icon={<ChecklistIcon />}
@@ -389,32 +426,37 @@ function Sidebar({ open, onClose }) {
               })),
             ]}
           />
-          <SidebarNavItem
-            label="Search"
-            icon={<SearchIcon />}
-            active={path === "/search"}
-            onClick={() => go("/search")}
-          />
+          {/* Search — desktop only (mobile has bottom nav) */}
+          <div className="hidden sm:block">
+            <SidebarNavItem
+              label="Search"
+              icon={<SearchIcon />}
+              active={path === "/search"}
+              onClick={() => go("/search")}
+            />
+          </div>
         </nav>
 
         {/* Settings pinned to bottom */}
         <div className="px-3 pb-4 border-t border-slate-800 pt-3">
-          <SidebarNavItem
-            label="Settings"
-            icon={<SettingsIcon />}
-            active={path === "/settings"}
-            onClick={() => go("/settings")}
-            subItems={[
-              {
-                label: "New group",
-                onClick: () => go("/settings?action=new-group"),
-              },
-              {
-                label: "New column",
-                onClick: () => go("/settings?action=new-column"),
-              },
-            ]}
-          />
+          <div className="hidden sm:block">
+            <SidebarNavItem
+              label="Settings"
+              icon={<SettingsIcon />}
+              active={path === "/settings"}
+              onClick={() => go("/settings")}
+              subItems={[
+                {
+                  label: "New group",
+                  onClick: () => go("/settings?action=new-group"),
+                },
+                {
+                  label: "New column",
+                  onClick: () => go("/settings?action=new-column"),
+                },
+              ]}
+            />
+          </div>
           {/* Keyboard shortcuts hint */}
           <div className="mt-3 px-2 py-3 rounded-lg bg-slate-900/40 border border-slate-800">
             <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">
@@ -564,6 +606,15 @@ function Dashboard({ onEditLead }) {
   const [statusFilter, setStatusFilter] = useState(null);
   const [activeGroup, setActiveGroup] = useState(null);
   const [selectMode, setSelectMode] = useState(false);
+  const [spreeMode, setSpreeMode] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("spree") === "1") {
+      setSpreeMode(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const groupFiltered = activeGroup
     ? leads.filter((l) => l.groupId === activeGroup)
@@ -598,6 +649,27 @@ function Dashboard({ onEditLead }) {
           lead{filteredLeads.length !== 1 ? "s" : ""}
         </p>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setSpreeMode(true)}
+            className="text-sm text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1.5"
+            title="Lead Spree — add leads fast (S)"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"
+              />
+            </svg>
+            Spree
+          </button>
           <button
             onClick={() => setSelectMode((s) => !s)}
             className={`text-sm transition-colors ${selectMode ? "text-blue-400 hover:text-blue-300" : "text-slate-500 hover:text-slate-300"}`}
@@ -647,6 +719,7 @@ function Dashboard({ onEditLead }) {
           </button>
         </div>
       </div>
+      {spreeMode && <LeadSpree onClose={() => setSpreeMode(false)} />}
       {activeGroup && groupFiltered.length === 0 ? (
         <EmptyState
           type="group"
@@ -725,6 +798,11 @@ export default function App() {
           e.preventDefault();
           navigate("/reference");
           break;
+        case "s":
+        case "S":
+          e.preventDefault();
+          navigate("/?spree=1");
+          break;
       }
     };
     window.addEventListener("keydown", handler);
@@ -735,7 +813,7 @@ export default function App() {
   const lastUpdated = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 
   return (
-    <div className="min-h-screen bg-[#03060f] text-slate-100">
+    <div className="min-h-screen bg-[#03060f] text-slate-100 pb-28 sm:pb-0">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <header className="border-b border-slate-800 bg-[#03060f]/90 sticky top-0 z-30 backdrop-blur-sm">
@@ -802,7 +880,7 @@ export default function App() {
             setEditingLead(null);
             setShowModal(true);
           }}
-          className="sm:hidden fixed bottom-6 right-6 z-30 w-14 h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+          className="sm:hidden fixed bottom-20 right-6 z-30 w-14 h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
           title="Add Lead"
         >
           <svg
@@ -829,6 +907,34 @@ export default function App() {
           existing={editingLead}
         />
       )}
+
+      {/* Bottom nav — mobile only */}
+      <nav
+        className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex items-center"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 10px)" }}
+      >
+        <BottomNavItem
+          path="/"
+          icon={<HomeIcon />}
+          label="Home"
+          currentPath={location.pathname}
+          navigate={navigate}
+        />
+        <BottomNavItem
+          path="/search"
+          icon={<SearchIcon />}
+          label="Search"
+          currentPath={location.pathname}
+          navigate={navigate}
+        />
+        <BottomNavItem
+          path="/settings"
+          icon={<SettingsIcon />}
+          label="Settings"
+          currentPath={location.pathname}
+          navigate={navigate}
+        />
+      </nav>
     </div>
   );
 }

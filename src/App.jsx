@@ -912,7 +912,7 @@ export default function App() {
       )}
 
       {/* Bottom nav — mobile only */}
-      <nav className="sm:hidden fixed bottom-0 pb-2 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex flex-col">
+      <nav className="sm:hidden fixed bottom-0 pb-4 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex flex-col">
         <div className="flex items-center">
           <BottomNavItem
             path="/"

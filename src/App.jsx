@@ -813,7 +813,7 @@ export default function App() {
   const lastUpdated = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 
   return (
-    <div className="min-h-screen bg-[#03060f] text-slate-100 pb-36 sm:pb-0">
+    <div className="min-h-screen bg-[#03060f] text-slate-100 pb-44 sm:pb-0">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <header className="border-b border-slate-800 bg-[#03060f]/90 sticky top-0 z-30 backdrop-blur-sm">
@@ -934,7 +934,7 @@ export default function App() {
           />
         </div>
         <div
-          style={{ height: "env(safe-area-inset-bottom, 24px)" }}
+          style={{ height: "env(safe-area-inset-bottom, 40px)" }}
           className="w-full bg-transparent"
         />
       </nav>

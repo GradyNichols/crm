@@ -188,12 +188,12 @@ function BottomNavItem({ path, icon, label, currentPath, navigate }) {
   return (
     <button
       onClick={() => navigate(path)}
-      className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-5 pb-6 transition-colors ${
+      className={`flex-1 flex flex-col items-center justify-center gap-1 py-4 transition-colors ${
         active ? "text-blue-400" : "text-slate-500 hover:text-slate-300"
       }`}
     >
-      {icon}
-      <span className="text-xs font-medium">{label}</span>
+      <span className="[&_svg]:w-6 [&_svg]:h-6">{icon}</span>
+      <span className="text-sm font-medium">{label}</span>
     </button>
   );
 }
@@ -438,7 +438,7 @@ function Sidebar({ open, onClose }) {
         </nav>
 
         {/* Settings pinned to bottom */}
-        <div className="px-3 pb-4 border-t border-slate-800 pt-3">
+        <div className="px-3 pb-8 border-t border-slate-800 pt-3">
           <div className="hidden sm:block">
             <SidebarNavItem
               label="Settings"
@@ -458,7 +458,7 @@ function Sidebar({ open, onClose }) {
             />
           </div>
           {/* Keyboard shortcuts hint */}
-          <div className="mt-3 px-2 py-3 rounded-lg bg-slate-900/40 border border-slate-800">
+          <div className="mt-3 mb-2 px-2 py-3 rounded-lg bg-slate-900/40 border border-slate-800">
             <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">
               Shortcuts
             </p>
@@ -813,7 +813,7 @@ export default function App() {
   const lastUpdated = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 
   return (
-    <div className="min-h-screen bg-[#03060f] text-slate-100 pb-32 sm:pb-0">
+    <div className="min-h-screen bg-[#03060f] text-slate-100 pb-36 sm:pb-0">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <header className="border-b border-slate-800 bg-[#03060f]/90 sticky top-0 z-30 backdrop-blur-sm">
@@ -934,7 +934,7 @@ export default function App() {
           />
         </div>
         <div
-          style={{ height: "env(safe-area-inset-bottom, 12px)" }}
+          style={{ height: "env(safe-area-inset-bottom, 24px)" }}
           className="w-full bg-transparent"
         />
       </nav>

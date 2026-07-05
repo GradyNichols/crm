@@ -188,7 +188,7 @@ function BottomNavItem({ path, icon, label, currentPath, navigate }) {
   return (
     <button
       onClick={() => navigate(path)}
-      className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-5 transition-colors ${
+      className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-5 pb-6 transition-colors ${
         active ? "text-blue-400" : "text-slate-500 hover:text-slate-300"
       }`}
     >
@@ -813,7 +813,7 @@ export default function App() {
   const lastUpdated = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 
   return (
-    <div className="min-h-screen bg-[#03060f] text-slate-100 pb-28 sm:pb-0">
+    <div className="min-h-screen bg-[#03060f] text-slate-100 pb-32 sm:pb-0">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <header className="border-b border-slate-800 bg-[#03060f]/90 sticky top-0 z-30 backdrop-blur-sm">
@@ -880,7 +880,7 @@ export default function App() {
             setEditingLead(null);
             setShowModal(true);
           }}
-          className="sm:hidden fixed bottom-20 right-6 z-30 w-14 h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+          className="sm:hidden fixed bottom-28 right-6 z-30 w-14 h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
           title="Add Lead"
         >
           <svg
@@ -909,30 +909,33 @@ export default function App() {
       )}
 
       {/* Bottom nav — mobile only */}
-      <nav
-        className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex items-center"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 10px)" }}
-      >
-        <BottomNavItem
-          path="/"
-          icon={<HomeIcon />}
-          label="Home"
-          currentPath={location.pathname}
-          navigate={navigate}
-        />
-        <BottomNavItem
-          path="/search"
-          icon={<SearchIcon />}
-          label="Search"
-          currentPath={location.pathname}
-          navigate={navigate}
-        />
-        <BottomNavItem
-          path="/settings"
-          icon={<SettingsIcon />}
-          label="Settings"
-          currentPath={location.pathname}
-          navigate={navigate}
+      <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex flex-col">
+        <div className="flex items-center">
+          <BottomNavItem
+            path="/"
+            icon={<HomeIcon />}
+            label="Home"
+            currentPath={location.pathname}
+            navigate={navigate}
+          />
+          <BottomNavItem
+            path="/search"
+            icon={<SearchIcon />}
+            label="Search"
+            currentPath={location.pathname}
+            navigate={navigate}
+          />
+          <BottomNavItem
+            path="/settings"
+            icon={<SettingsIcon />}
+            label="Settings"
+            currentPath={location.pathname}
+            navigate={navigate}
+          />
+        </div>
+        <div
+          style={{ height: "env(safe-area-inset-bottom, 12px)" }}
+          className="w-full bg-transparent"
         />
       </nav>
     </div>

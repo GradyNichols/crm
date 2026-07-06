@@ -243,14 +243,17 @@ export default function LeadSpree({ onClose }) {
           )}
 
           {current.type === "date" && (
-            <input
-              ref={inputRef}
-              type="date"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="w-full max-w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-base rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors box-border"
-            />
+            <div className="w-full overflow-hidden">
+              <input
+                ref={inputRef}
+                type="date"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                style={{ width: "100%", minWidth: 0 }}
+                className="block w-full min-w-0 bg-slate-800/60 border border-slate-700 text-slate-100 text-base rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors appearance-none"
+              />
+            </div>
           )}
 
           {current.type === "textarea" && (

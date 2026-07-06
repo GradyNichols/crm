@@ -46,3 +46,10 @@
 .leaflet-popup-pane {
   z-index: 8 !important;
 }
+
+/* Fix iOS date input overflow */
+input[type="date"] {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}

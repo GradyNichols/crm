@@ -88,7 +88,21 @@ export default function SummaryBar({ leads, statusFilter, onStatusClick }) {
             onClick={() => onStatusClick(statusFilter)}
             className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 transition-colors"
           >
-            Clear ×
+            Clear{" "}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4 inline-block"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18 18 6M6 6l12 12"
+              />
+            </svg>
           </button>
         )}
       </div>

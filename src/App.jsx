@@ -227,7 +227,7 @@ function SidebarNavItem({ label, icon, active, onClick, badge, subItems }) {
     <div>
       {/* Main row — label navigates, chevron toggles dropdown */}
       <div
-        className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
+        className={`flex items-center rounded-lg text-base font-medium transition-colors ${
           active
             ? "bg-blue-950/60 text-blue-300"
             : "text-slate-400 hover:text-slate-200"
@@ -235,9 +235,9 @@ function SidebarNavItem({ label, icon, active, onClick, badge, subItems }) {
       >
         <button
           onClick={onClick}
-          className="flex items-center gap-3 flex-1 px-4 py-2.5 text-left"
+          className="flex items-center gap-3.5 flex-1 px-4 py-3 text-left"
         >
-          <span className="shrink-0">{icon}</span>
+          <span className="shrink-0 [&_svg]:w-5 [&_svg]:h-5">{icon}</span>
           <span className="flex-1">{label}</span>
           {badge > 0 && (
             <span className="text-xs bg-blue-600 text-white font-semibold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
@@ -248,7 +248,7 @@ function SidebarNavItem({ label, icon, active, onClick, badge, subItems }) {
         {hasSubItems && (
           <button
             onClick={() => setExpanded((e) => !e)}
-            className="px-2.5 py-2.5 hover:bg-slate-800/60 rounded-lg transition-colors"
+            className="px-3 py-3 hover:bg-slate-800/60 rounded-lg transition-colors"
             title="Show actions"
           >
             <ChevronIcon open={expanded} />
@@ -263,7 +263,7 @@ function SidebarNavItem({ label, icon, active, onClick, badge, subItems }) {
             <button
               key={item.label}
               onClick={item.onClick}
-              className="w-full text-left text-xs text-slate-500 hover:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-800/40 transition-colors"
+              className="w-full text-left text-sm text-slate-500 hover:text-slate-200 px-3 py-2 rounded-lg hover:bg-slate-800/40 transition-colors"
             >
               {item.label}
             </button>
@@ -484,10 +484,10 @@ function Sidebar({ open, onClose }) {
                 ["R", "Reference"],
               ].map(([key, label]) => (
                 <div key={key} className="flex items-center gap-1.5">
-                  <kbd className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                  <kbd className="text-sm bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
                     {key}
                   </kbd>
-                  <span className="text-xs text-slate-600">{label}</span>
+                  <span className="text-sm text-slate-600">{label}</span>
                 </div>
               ))}
             </div>
@@ -896,7 +896,7 @@ export default function App() {
             setEditingLead(null);
             setShowModal(true);
           }}
-          className="sm:hidden fixed bottom-36 right-6 z-30 w-14 h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+          className="sm:hidden fixed bottom-32 right-6 z-30 w-14 h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
           title="Add Lead"
         >
           <svg

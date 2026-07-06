@@ -230,9 +230,7 @@ export default function LeadSpree({ onClose }) {
           </div>
 
           {/* Input */}
-          {(current.type === "text" ||
-            current.type === "tel" ||
-            current.type === "date") && (
+          {(current.type === "text" || current.type === "tel") && (
             <input
               ref={inputRef}
               type={current.type}
@@ -241,6 +239,17 @@ export default function LeadSpree({ onClose }) {
               onKeyDown={handleKeyDown}
               placeholder={current.placeholder}
               className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-lg rounded-xl px-4 py-3 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+            />
+          )}
+
+          {current.type === "date" && (
+            <input
+              ref={inputRef}
+              type="date"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-full max-w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-base rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors box-border"
             />
           )}
 

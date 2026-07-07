@@ -260,6 +260,17 @@ const useCRMStore = create(
       // Stores { address: { lat, lng } } to avoid re-geocoding the same address
       geocache: {},
 
+      notifSettings: {
+        enabled: false,
+        summary: true,
+        overdue: true,
+        stale: true,
+      },
+
+      setNotifSettings: (updates) => {
+        set((s) => ({ notifSettings: { ...s.notifSettings, ...updates } }));
+      },
+
       setGeocode: (address, coords) => {
         set((s) => ({ geocache: { ...s.geocache, [address]: coords } }));
       },
@@ -274,6 +285,8 @@ const useCRMStore = create(
         sortDir: s.sortDir,
         refSections: s.refSections,
         geocache: s.geocache,
+        notificationSettings: s.notificationSettings,
+        notifSettings: s.notifSettings,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -282,6 +295,18 @@ const useCRMStore = create(
         groups: persisted.groups || [],
         refSections: persisted.refSections || [],
         geocache: persisted.geocache || {},
+        notificationSettings: persisted.notificationSettings || {
+          enabled: false,
+          overdue: true,
+          dueToday: true,
+          stale: true,
+        },
+        notifSettings: persisted.notifSettings || {
+          enabled: false,
+          summary: true,
+          overdue: true,
+          stale: true,
+        },
       }),
     },
   ),

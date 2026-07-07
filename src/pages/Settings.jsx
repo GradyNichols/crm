@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
+import { requestPermission } from "../hooks/useNotifications";
 
 const FIELD_TYPES = [
   { value: "text", label: "Text", desc: "Free-form text entry" },
@@ -76,6 +77,11 @@ export default function Settings() {
   const deleteCustomColumn = useCRMStore((s) => s.deleteCustomColumn);
   const groups = useCRMStore((s) => s.groups) ?? [];
   const { addGroup, renameGroup, deleteGroup } = useCRMStore.getState();
+  const notifSettings = useCRMStore((s) => s.notificationSettings) ?? {};
+  const setNotificationSettings = useCRMStore((s) => s.setNotificationSettings);
+  const [notifPermission, setNotifPermission] = useState(() =>
+    "Notification" in window ? Notification.permission : "unsupported",
+  );
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [errors, setErrors] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -184,6 +190,132 @@ export default function Settings() {
           </p>
         </div>
       </div>
+
+      {/* ── Notifications ── */}
+      <section id="notifications-section">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
+          Notifications
+        </h3>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-5 py-5 space-y-5">
+          {notifPermission === "unsupported" && (
+            <p className="text-sm text-slate-500">
+              Notifications are not supported in this browser.
+            </p>
+          )}
+
+          {notifPermission !== "unsupported" && (
+            <>
+              {/* Master toggle + permission */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-200 text-sm font-medium">
+                    Enable notifications
+                  </p>
+                  <p className="text-slate-600 text-xs mt-0.5">
+                    {notifPermission === "denied"
+                      ? "Permission denied — enable in browser settings"
+                      : notifPermission === "granted"
+                        ? "Permission granted"
+                        : "Permission not yet granted"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {notifPermission !== "granted" &&
+                    notifPermission !== "denied" && (
+                      <button
+                        onClick={async () => {
+                          const result = await requestPermission();
+                          setNotifPermission(result);
+                          if (result === "granted")
+                            setNotificationSettings({ enabled: true });
+                        }}
+                        className="text-xs text-blue-400 hover:text-blue-300 border border-blue-900/50 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Allow
+                      </button>
+                    )}
+                  <button
+                    onClick={() => {
+                      if (notifPermission !== "granted") return;
+                      setNotificationSettings({
+                        enabled: !notifSettings.enabled,
+                      });
+                    }}
+                    disabled={notifPermission !== "granted"}
+                    className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                      notifSettings.enabled ? "bg-blue-600" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                        notifSettings.enabled
+                          ? "translate-x-5"
+                          : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-settings */}
+              {notifSettings.enabled && (
+                <div className="space-y-3 border-t border-slate-800 pt-4">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Notify me about
+                  </p>
+                  {[
+                    {
+                      key: "overdue",
+                      label: "Overdue follow-ups",
+                      desc: "When a follow-up date has passed",
+                    },
+                    {
+                      key: "dueToday",
+                      label: "Due today",
+                      desc: "Follow-ups scheduled for today",
+                    },
+                    {
+                      key: "stale",
+                      label: "Going stale",
+                      desc: "Leads with no recent contact",
+                    },
+                  ].map(({ key, label, desc }) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="text-slate-300 text-sm">{label}</p>
+                        <p className="text-slate-600 text-xs">{desc}</p>
+                      </div>
+                      <button
+                        onClick={() =>
+                          setNotificationSettings({
+                            [key]: !notifSettings[key],
+                          })
+                        }
+                        className={`relative w-10 h-5 rounded-full transition-colors ${
+                          notifSettings[key] !== false
+                            ? "bg-blue-600"
+                            : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                            notifSettings[key] !== false
+                              ? "translate-x-5"
+                              : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
 
       {/* ── Groups ── */}
       <section id="groups-section">

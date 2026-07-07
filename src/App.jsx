@@ -22,6 +22,8 @@ import LeadDetail from "./pages/LeadDetail";
 import Import from "./pages/Import";
 import Map from "./pages/MapPage";
 import LeadSpree from "./pages/LeadSpree";
+import { useNotifications, requestPermission } from "./hooks/useNotifications";
+import Progress from "./pages/Progress";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 
@@ -198,6 +200,22 @@ function BottomNavItem({ path, icon, label, currentPath, navigate }) {
   );
 }
 
+const ProgressIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"
+    />
+  </svg>
+);
 // ── Sidebar nav item ─────────────────────────────────────────────────────────────
 
 function ChevronIcon({ open }) {
@@ -390,6 +408,12 @@ function Sidebar({ open, onClose }) {
             />
           </div>
           <SidebarNavItem
+            label="Progress"
+            icon={<ProgressIcon />}
+            active={path === "/progress"}
+            onClick={() => go("/progress")}
+          />
+          <SidebarNavItem
             label="Checklist"
             icon={<ChecklistIcon />}
             active={path === "/checklist"}
@@ -482,6 +506,7 @@ function Sidebar({ open, onClose }) {
                 ["C", "Checklist"],
                 ["M", "Map"],
                 ["R", "Reference"],
+                ["P", "Progress"],
               ].map(([key, label]) => (
                 <div key={key} className="flex items-center gap-1.5">
                   <kbd className="text-sm bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
@@ -766,6 +791,8 @@ export default function App() {
     else addLead(form);
   };
 
+  useNotifications();
+
   const handleEdit = (lead) => {
     setEditingLead(lead);
     setShowModal(true);
@@ -810,6 +837,11 @@ export default function App() {
         case "R":
           e.preventDefault();
           navigate("/reference");
+          break;
+        case "p":
+        case "P":
+          e.preventDefault();
+          navigate("/progress");
           break;
         case "s":
         case "S":
@@ -883,6 +915,7 @@ export default function App() {
         <Route path="/ai" element={<AI />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
         <Route path="/import" element={<Import />} />
+        <Route path="/progress" element={<Progress />} />
         <Route path="/map" element={<Map />} />
       </Routes>
 
@@ -925,7 +958,7 @@ export default function App() {
       )}
 
       {/* Bottom nav — mobile only */}
-      <nav className="sm:hidden pb-4 fixed bottom-0 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex flex-col">
+      <nav className="pb-4 sm:hidden fixed bottom-0 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex flex-col">
         <div className="flex items-center">
           <BottomNavItem
             path="/"

@@ -77,8 +77,8 @@ export default function Settings() {
   const deleteCustomColumn = useCRMStore((s) => s.deleteCustomColumn);
   const groups = useCRMStore((s) => s.groups) ?? [];
   const { addGroup, renameGroup, deleteGroup } = useCRMStore.getState();
-  const notifSettings = useCRMStore((s) => s.notificationSettings) ?? {};
-  const setNotificationSettings = useCRMStore((s) => s.setNotificationSettings);
+  const notifSettings = useCRMStore((s) => s.notifSettings) ?? {};
+  const setNotificationSettings = useCRMStore.getState().setNotifSettings;
   const [notifPermission, setNotifPermission] = useState(() =>
     "Notification" in window ? Notification.permission : "unsupported",
   );

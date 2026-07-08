@@ -46,7 +46,7 @@ export async function requestPermission() {
 
 export function useNotifications() {
   const leads = useCRMStore((s) => s.leads) ?? [];
-  const settings = useCRMStore((s) => s.notificationSettings) ?? {};
+  const settings = useCRMStore((s) => s.notifSettings) ?? {};
 
   useEffect(() => {
     if (!("Notification" in window)) return;

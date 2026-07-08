@@ -274,6 +274,49 @@ const useCRMStore = create(
       setGeocode: (address, coords) => {
         set((s) => ({ geocache: { ...s.geocache, [address]: coords } }));
       },
+
+      // ── Backup / Restore ────────────────────────────────────────────────────
+      restoreBackup: (data) => {
+        set({
+          leads: (data.leads || []).map(migrateNotes),
+          customColumns: data.customColumns || [],
+          groups: data.groups || [],
+          refSections: data.refSections || [],
+          geocache: data.geocache || {},
+          notifSettings: data.notifSettings || {
+            enabled: false,
+            summary: true,
+            overdue: true,
+            stale: true,
+          },
+        });
+      },
+
+      mergeBackup: (data) => {
+        set((s) => {
+          const existingIds = new Set(s.leads.map((l) => l.id));
+          const existingNames = new Set(
+            s.leads.map((l) => l.businessName.toLowerCase()),
+          );
+          const newLeads = (data.leads || [])
+            .map(migrateNotes)
+            .filter(
+              (l) =>
+                !existingIds.has(l.id) &&
+                !existingNames.has(l.businessName.toLowerCase()),
+            );
+          const existingGroupNames = new Set(
+            s.groups.map((g) => g.name.toLowerCase()),
+          );
+          const newGroups = (data.groups || []).filter(
+            (g) => !existingGroupNames.has(g.name.toLowerCase()),
+          );
+          return {
+            leads: [...s.leads, ...newLeads],
+            groups: [...s.groups, ...newGroups],
+          };
+        });
+      },
     }),
     {
       name: "crm_leads",

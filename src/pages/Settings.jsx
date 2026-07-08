@@ -69,6 +69,28 @@ function DeleteConfirmModal({ col, label, onConfirm, onCancel }) {
   );
 }
 
+function exportBackup(state) {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    leads: state.leads,
+    customColumns: state.customColumns,
+    groups: state.groups,
+    refSections: state.refSections,
+    geocache: state.geocache,
+    notifSettings: state.notifSettings,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `trace-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -76,7 +98,8 @@ export default function Settings() {
   const addCustomColumn = useCRMStore((s) => s.addCustomColumn);
   const deleteCustomColumn = useCRMStore((s) => s.deleteCustomColumn);
   const groups = useCRMStore((s) => s.groups) ?? [];
-  const { addGroup, renameGroup, deleteGroup } = useCRMStore.getState();
+  const { addGroup, renameGroup, deleteGroup, restoreBackup, mergeBackup } =
+    useCRMStore.getState();
   const notifSettings = useCRMStore((s) => s.notifSettings) ?? {};
   const setNotificationSettings = useCRMStore.getState().setNotifSettings;
   const [notifPermission, setNotifPermission] = useState(() =>
@@ -86,6 +109,9 @@ export default function Settings() {
   const [errors, setErrors] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [backupPreview, setBackupPreview] = useState(null); // parsed JSON
+  const [backupError, setBackupError] = useState("");
+  const [backupDone, setBackupDone] = useState("");
 
   const [newGroupName, setNewGroupName] = useState("");
   const [groupError, setGroupError] = useState("");
@@ -190,6 +216,188 @@ export default function Settings() {
           </p>
         </div>
       </div>
+
+      {/* ── Data Backup ── */}
+      <section id="backup-section">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
+          Data Backup & Restore
+        </h3>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-5 py-5 space-y-5">
+          {/* Export */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-200 text-sm font-medium">
+                Export backup
+              </p>
+              <p className="text-slate-600 text-xs mt-0.5">
+                Downloads all your data as a .json file
+              </p>
+            </div>
+            <button
+              onClick={() => exportBackup(useCRMStore.getState())}
+              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 px-4 py-2 rounded-lg transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                />
+              </svg>
+              Export
+            </button>
+          </div>
+
+          <div className="h-px bg-slate-800" />
+
+          {/* Import */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-200 text-sm font-medium">
+                  Import backup
+                </p>
+                <p className="text-slate-600 text-xs mt-0.5">
+                  Restore from a previously exported .json file
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 px-4 py-2 rounded-lg transition-colors cursor-pointer">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M7.5 7.5 12 3m0 0 4.5 4.5M12 3v13.5"
+                  />
+                </svg>
+                Choose file
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setBackupError("");
+                    setBackupPreview(null);
+                    setBackupDone("");
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      try {
+                        const parsed = JSON.parse(ev.target.result);
+                        if (!parsed.leads && !parsed.groups)
+                          throw new Error("Invalid backup file");
+                        setBackupPreview(parsed);
+                      } catch {
+                        setBackupError(
+                          "Invalid file — make sure this is a Trace backup.",
+                        );
+                      }
+                    };
+                    reader.readAsText(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
+            {backupError && (
+              <p className="text-sm text-red-400">{backupError}</p>
+            )}
+            {backupDone && (
+              <p className="text-sm text-green-400">{backupDone}</p>
+            )}
+
+            {/* Preview + actions */}
+            {backupPreview && (
+              <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-4 space-y-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Backup contents
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                  {[
+                    ["Leads", (backupPreview.leads || []).length],
+                    ["Groups", (backupPreview.groups || []).length],
+                    ["Sections", (backupPreview.refSections || []).length],
+                    ["Columns", (backupPreview.customColumns || []).length],
+                  ].map(([label, count]) => (
+                    <div
+                      key={label}
+                      className="rounded-lg bg-slate-800/60 px-3 py-2 text-center"
+                    >
+                      <p className="text-slate-100 font-semibold text-lg tabular-nums">
+                        {count}
+                      </p>
+                      <p className="text-slate-600 text-xs">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {backupPreview.exportedAt && (
+                  <p className="text-xs text-slate-600">
+                    Exported{" "}
+                    {new Date(backupPreview.exportedAt).toLocaleDateString(
+                      "en-US",
+                      { month: "long", day: "numeric", year: "numeric" },
+                    )}
+                  </p>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      mergeBackup(backupPreview);
+                      setBackupPreview(null);
+                      setBackupDone(
+                        "Merged successfully — new leads and groups added.",
+                      );
+                    }}
+                    className="text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Merge
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          "This will replace ALL your current data. Are you sure?",
+                        )
+                      )
+                        return;
+                      restoreBackup(backupPreview);
+                      setBackupPreview(null);
+                      setBackupDone("Restored successfully.");
+                    }}
+                    className="text-sm font-medium bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Replace all
+                  </button>
+                  <button
+                    onClick={() => {
+                      setBackupPreview(null);
+                      setBackupDone("");
+                    }}
+                    className="text-sm text-slate-500 hover:text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* ── Notifications ── */}
       <section id="notifications-section">

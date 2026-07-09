@@ -20,6 +20,7 @@ const EMPTY_FORM = {
 export default function LeadModal({ onClose, onSave, existing }) {
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const groups = useCRMStore((s) => s.groups) ?? [];
+  const logTouchpoint = useCRMStore.getState().logTouchpoint;
 
   const buildForm = () => {
     if (!existing) return { ...EMPTY_FORM };
@@ -32,6 +33,8 @@ export default function LeadModal({ onClose, onSave, existing }) {
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [winLossReason, setWinLossReason] = useState("");
 
   const handleClose = () => {
     if (dirty) {
@@ -63,9 +66,15 @@ export default function LeadModal({ onClose, onSave, existing }) {
   };
 
   const handleStatusChange = (status) => {
+    if (
+      (status === "Dead" || status === "Closed") &&
+      !["Dead", "Closed"].includes(form.status)
+    ) {
+      setPendingStatus(status);
+      return;
+    }
     const updates = { status };
     if (status === "Dead" || status === "Closed") {
-      // Clear follow-up date for terminal statuses
       updates.followUpDate = "";
     } else if (FOLLOWUP_DAYS[status]) {
       const days = FOLLOWUP_DAYS[status];
@@ -79,6 +88,19 @@ export default function LeadModal({ onClose, onSave, existing }) {
       }
     }
     Object.entries(updates).forEach(([k, v]) => set(k, v));
+  };
+
+  const handleWinLossConfirm = () => {
+    set("status", pendingStatus);
+    set("followUpDate", "");
+    if (winLossReason.trim() && existing) {
+      logTouchpoint(existing.id, {
+        type: "Phone Call",
+        note: `[${pendingStatus}] ${winLossReason.trim()}`,
+      });
+    }
+    setPendingStatus(null);
+    setWinLossReason("");
   };
 
   const validate = () => {
@@ -328,6 +350,115 @@ export default function LeadModal({ onClose, onSave, existing }) {
             {saved ? "✓ Saved" : existing ? "Save Changes" : "Add Lead"}
           </button>
         </div>
+
+        {/* Win/loss reason overlay */}
+        {pendingStatus && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setPendingStatus(null);
+                setWinLossReason("");
+              }
+            }}
+          >
+            <div className="w-full max-w-sm bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${pendingStatus === "Closed" ? "bg-green-950" : "bg-red-950"}`}
+                >
+                  {pendingStatus === "Closed" ? (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-5 h-5 text-green-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-5 h-5 text-red-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18 18 6M6 6l12 12"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-slate-100 font-semibold text-base">
+                    {pendingStatus === "Closed"
+                      ? "Mark as Closed 🎉"
+                      : "Mark as Dead"}
+                  </h3>
+                  <p className="text-slate-500 text-sm mt-0.5">
+                    {form.businessName || "This lead"}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  {pendingStatus === "Closed"
+                    ? "What closed the deal?"
+                    : "Why did this go dead?"}
+                  <span className="text-slate-700 font-normal normal-case ml-1">
+                    (optional)
+                  </span>
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={winLossReason}
+                  onChange={(e) => setWinLossReason(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleWinLossConfirm();
+                    if (e.key === "Escape") {
+                      setPendingStatus(null);
+                      setWinLossReason("");
+                    }
+                  }}
+                  placeholder={
+                    pendingStatus === "Closed"
+                      ? "e.g. Called back, loved the portfolio"
+                      : "e.g. Already has a developer"
+                  }
+                  className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  onClick={() => {
+                    setPendingStatus(null);
+                    setWinLossReason("");
+                  }}
+                  className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleWinLossConfirm}
+                  className={`text-sm font-medium text-white px-5 py-2 rounded-lg transition-colors ${pendingStatus === "Closed" ? "bg-green-700 hover:bg-green-600" : "bg-red-700 hover:bg-red-600"}`}
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Discard changes overlay */}
         {confirmDiscard && (

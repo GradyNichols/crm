@@ -331,7 +331,17 @@ export default function LeadDetail() {
                   className="flex items-start gap-3 px-5 py-3.5 bg-slate-900/20 hover:bg-slate-900/40 transition-colors group"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-slate-300 text-sm">{entry.text}</p>
+                    <p
+                      className={`text-sm ${
+                        entry.text?.startsWith("[Closed]")
+                          ? "text-green-400 font-medium"
+                          : entry.text?.startsWith("[Dead]")
+                            ? "text-red-400 font-medium"
+                            : "text-slate-300"
+                      }`}
+                    >
+                      {entry.text}
+                    </p>
                     <p className="text-slate-600 text-xs mt-1">{entry.ts}</p>
                   </div>
                   <button

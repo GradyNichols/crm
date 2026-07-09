@@ -97,17 +97,151 @@ function CustomCell({ col, value }) {
 
 function StatusCell({ lead }) {
   const updateLead = useCRMStore((s) => s.updateLead);
+  const logTouchpoint = useCRMStore((s) => s.logTouchpoint);
   const [editing, setEditing] = useState(false);
+  const [pendingStatus, setPending] = useState(null); // Closed | Dead
+  const [reason, setReason] = useState("");
+
+  const TERMINAL = ["Closed", "Dead"];
+
+  const handleChange = (status) => {
+    if (TERMINAL.includes(status) && !TERMINAL.includes(lead.status)) {
+      setPending(status);
+      setEditing(false);
+    } else {
+      updateLead(lead.id, { status });
+      setEditing(false);
+    }
+  };
+
+  const handleConfirm = () => {
+    updateLead(lead.id, { status: pendingStatus });
+    if (reason.trim()) {
+      logTouchpoint(lead.id, {
+        type: pendingStatus === "Closed" ? "Walk-in" : "Phone Call",
+        note: `[${pendingStatus}] ${reason.trim()}`,
+      });
+    }
+    setPending(null);
+    setReason("");
+  };
+
+  if (pendingStatus) {
+    return (
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setPending(null);
+            setReason("");
+          }
+        }}
+      >
+        <div className="w-full max-w-sm bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${pendingStatus === "Closed" ? "bg-green-950" : "bg-red-950"}`}
+            >
+              {pendingStatus === "Closed" ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 text-green-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 text-red-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18 18 6M6 6l12 12"
+                  />
+                </svg>
+              )}
+            </div>
+            <div>
+              <h3 className="text-slate-100 font-semibold text-base">
+                {pendingStatus === "Closed"
+                  ? "Mark as Closed 🎉"
+                  : "Mark as Dead"}
+              </h3>
+              <p className="text-slate-500 text-sm mt-0.5">
+                {lead.businessName}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              {pendingStatus === "Closed"
+                ? "What closed the deal?"
+                : "Why did this go dead?"}
+              <span className="text-slate-700 font-normal normal-case ml-1">
+                (optional)
+              </span>
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleConfirm();
+                if (e.key === "Escape") {
+                  setPending(null);
+                  setReason("");
+                }
+              }}
+              placeholder={
+                pendingStatus === "Closed"
+                  ? "e.g. Called back, loved the portfolio"
+                  : "e.g. Already has a developer, no budget"
+              }
+              className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-1">
+            <button
+              onClick={() => {
+                setPending(null);
+                setReason("");
+              }}
+              className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              className={`text-sm font-medium text-white px-5 py-2 rounded-lg transition-colors ${pendingStatus === "Closed" ? "bg-green-700 hover:bg-green-600" : "bg-red-700 hover:bg-red-600"}`}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (editing) {
     return (
       <select
         autoFocus
         value={lead.status}
-        onChange={(e) => {
-          updateLead(lead.id, { status: e.target.value });
-          setEditing(false);
-        }}
+        onChange={(e) => handleChange(e.target.value)}
         onBlur={() => setEditing(false)}
         onClick={(e) => e.stopPropagation()}
         className="bg-slate-800 border border-blue-500 text-slate-100 text-sm rounded-lg px-2 py-0.5 focus:outline-none"
@@ -144,7 +278,17 @@ function NotesLog({ lead }) {
         <div key={entry.id} className="flex items-start gap-2 group/note">
           <div className="flex-1 min-w-0">
             <span className="text-slate-500 text-xs">{entry.ts} — </span>
-            <span className="text-slate-400 text-xs">{entry.text}</span>
+            <span
+              className={`text-xs ${
+                entry.text?.startsWith("[Closed]")
+                  ? "text-green-400 font-medium"
+                  : entry.text?.startsWith("[Dead]")
+                    ? "text-red-400 font-medium"
+                    : "text-slate-400"
+              }`}
+            >
+              {entry.text}
+            </span>
           </div>
           <button
             onClick={(e) => {

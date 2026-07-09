@@ -24,6 +24,7 @@ import Map from "./pages/MapPage";
 import LeadSpree from "./pages/LeadSpree";
 import { useNotifications, requestPermission } from "./hooks/useNotifications";
 import Progress from "./pages/Progress";
+import CallPrep from "./pages/CallPrep";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 
@@ -917,6 +918,7 @@ export default function App() {
         <Route path="/import" element={<Import />} />
         <Route path="/progress" element={<Progress />} />
         <Route path="/map" element={<Map />} />
+        <Route path="/call/:id" element={<CallPrep />} />
       </Routes>
 
       {/* Mobile bottom spacer — pushes content above fixed nav */}

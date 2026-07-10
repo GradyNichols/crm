@@ -194,8 +194,8 @@ export default function CallPrep() {
   const QUICK_STATUSES = ["Warm", "Waiting", "Contacted", "Closed", "Dead"];
 
   return (
-    <div className="z-50 fixed left-0 right-0 inset-0 bg-[#03060f] flex flex-col overflow-hidden">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-8 py-12">
+    <div className="z-50 fixed left-0 right-0 items-center px-4 sm:px-6 pb-8 py-12 inset-0 bg-[#03060f] flex flex-col overflow-hidden">
+      <div className="min-w-1/2 max-w-3xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-6 pb-4 shrink-0">
           <button

@@ -78,7 +78,7 @@ function SummaryModal({ summary, leads, onDismiss }) {
 }
 
 // ── Log form shown after checking off a lead ─────────────────────────────────────
-function LogForm({ lead, onLog, onSkip }) {
+function LogForm({ lead, onLog, onSkip, onCancel }) {
   const [note, setNote] = useState("");
   const [type, setType] = useState("Phone Call");
   const inputRef = useRef(null);
@@ -123,6 +123,12 @@ function LogForm({ lead, onLog, onSkip }) {
           />
         </div>
         <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            className="text-sm text-slate-600 hover:text-slate-400 px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            Cancel
+          </button>
           <button
             onClick={onSkip}
             className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
@@ -229,6 +235,7 @@ export default function DailyPlan() {
     addToPlan,
     removeFromPlan,
     checkOffPlan,
+    uncheckPlan,
     movePlanItem,
     clearDailyPlan,
     dismissPlanSummary,
@@ -270,6 +277,10 @@ export default function DailyPlan() {
   };
 
   const handleSkip = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (logTarget.lead.lastTouchDate !== today) {
+      logTouchpoint(logTarget.lead.id, { type: "Phone Call", note: "" });
+    }
     checkOffPlan(logTarget.item.leadId);
     setLogTarget(null);
   };
@@ -502,7 +513,7 @@ export default function DailyPlan() {
             return (
               <div
                 key={item.leadId}
-                className="flex items-center gap-3 rounded-xl border border-slate-800/40 bg-slate-900/10 px-4 py-3 opacity-50"
+                className="flex items-center gap-3 rounded-xl border border-slate-800/40 bg-slate-900/10 px-4 py-3 opacity-80"
               >
                 <div className="w-6 h-6 rounded-full bg-green-600 border-2 border-green-600 flex items-center justify-center shrink-0">
                   <svg
@@ -523,6 +534,13 @@ export default function DailyPlan() {
                 <p className="text-slate-500 text-base line-through flex-1 truncate">
                   {lead.businessName}
                 </p>
+                <button
+                  onClick={() => uncheckPlan(item.leadId)}
+                  className="text-xs text-slate-600 hover:text-slate-300 border border-slate-800 hover:border-slate-600 px-2.5 py-1 rounded-lg transition-colors shrink-0"
+                  title="Undo"
+                >
+                  Undo
+                </button>
               </div>
             );
           })}
@@ -540,7 +558,12 @@ export default function DailyPlan() {
       )}
 
       {logTarget && (
-        <LogForm lead={logTarget.lead} onLog={handleLog} onSkip={handleSkip} />
+        <LogForm
+          lead={logTarget.lead}
+          onLog={handleLog}
+          onSkip={handleSkip}
+          onCancel={() => setLogTarget(null)}
+        />
       )}
 
       {showSummary && (

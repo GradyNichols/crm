@@ -346,6 +346,14 @@ const useCRMStore = create(
         }));
       },
 
+      uncheckPlan: (leadId) => {
+        set((s) => ({
+          dailyPlan: s.dailyPlan.map((i) =>
+            i.leadId === leadId ? { ...i, checkedAt: null } : i,
+          ),
+        }));
+      },
+
       movePlanItem: (leadId, dir) => {
         set((s) => {
           const pending = s.dailyPlan.filter((i) => !i.checkedAt);

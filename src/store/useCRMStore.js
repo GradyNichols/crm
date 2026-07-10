@@ -317,6 +317,62 @@ const useCRMStore = create(
           };
         });
       },
+
+      // ── Daily Plan ──────────────────────────────────────────────────────────────
+      dailyPlan: [], // [{ leadId, checkedAt: null | 'ISO date' }]
+      lastPlanDate: null, // 'YYYY-MM-DD'
+      lastPlanSummary: [], // copy of checked items from previous day
+
+      addToPlan: (leadId) => {
+        set((s) => {
+          if (s.dailyPlan.find((i) => i.leadId === leadId)) return {};
+          return { dailyPlan: [...s.dailyPlan, { leadId, checkedAt: null }] };
+        });
+      },
+
+      removeFromPlan: (leadId) => {
+        set((s) => ({
+          dailyPlan: s.dailyPlan.filter((i) => i.leadId !== leadId),
+        }));
+      },
+
+      checkOffPlan: (leadId) => {
+        set((s) => ({
+          dailyPlan: s.dailyPlan.map((i) =>
+            i.leadId === leadId
+              ? { ...i, checkedAt: new Date().toISOString() }
+              : i,
+          ),
+        }));
+      },
+
+      movePlanItem: (leadId, dir) => {
+        set((s) => {
+          const pending = s.dailyPlan.filter((i) => !i.checkedAt);
+          const checked = s.dailyPlan.filter((i) => !!i.checkedAt);
+          const idx = pending.findIndex((i) => i.leadId === leadId);
+          const newIdx = idx + dir;
+          if (newIdx < 0 || newIdx >= pending.length) return {};
+          const arr = [...pending];
+          [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+          return { dailyPlan: [...arr, ...checked] };
+        });
+      },
+
+      clearDailyPlan: (today) => {
+        set((s) => {
+          const checked = s.dailyPlan.filter((i) => !!i.checkedAt);
+          return {
+            dailyPlan: s.dailyPlan.filter((i) => !i.checkedAt),
+            lastPlanDate: today,
+            lastPlanSummary: checked,
+          };
+        });
+      },
+
+      dismissPlanSummary: () => {
+        set({ lastPlanSummary: [] });
+      },
     }),
     {
       name: "crm_leads",
@@ -330,6 +386,9 @@ const useCRMStore = create(
         geocache: s.geocache,
         notificationSettings: s.notificationSettings,
         notifSettings: s.notifSettings,
+        dailyPlan: s.dailyPlan,
+        lastPlanDate: s.lastPlanDate,
+        lastPlanSummary: s.lastPlanSummary,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -350,6 +409,9 @@ const useCRMStore = create(
           overdue: true,
           stale: true,
         },
+        dailyPlan: persisted.dailyPlan || [],
+        lastPlanDate: persisted.lastPlanDate || null,
+        lastPlanSummary: persisted.lastPlanSummary || [],
       }),
     },
   ),

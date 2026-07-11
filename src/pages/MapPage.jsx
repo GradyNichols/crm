@@ -264,9 +264,11 @@ export default function Map() {
       const lead = toGeocode[i];
       try {
         const coords = await geocodeAddress(lead.address);
-        if (coords) setGeocode(lead.address, coords);
+        setGeocode(lead.address, coords ?? null);
         await new Promise((r) => setTimeout(r, 1100));
-      } catch {}
+      } catch {
+        setGeocode(lead.address, null);
+      }
       setProgress({ done: i + 1, total: toGeocode.length });
     }
     setGeocoding(false);
@@ -281,7 +283,10 @@ export default function Map() {
   }, [geocache, leads]);
 
   const plottable = filtered.filter((l) => resolved[l.id]);
-  const unresolved = leadsWithAddress.filter((l) => !geocache[l.address]);
+  const unresolved = leadsWithAddress.filter(
+    (l) => geocache[l.address] === undefined,
+  );
+  const failed = leadsWithAddress.filter((l) => geocache[l.address] === null);
   const defaultCenter = [34.2694, -118.7815];
 
   // Route actions
@@ -561,12 +566,16 @@ export default function Map() {
           )}
 
           {/* Unplotted badge */}
-          {leadsWithAddress.length - plottable.length > 0 &&
+          {leadsWithAddress.length - plottable.length - failed.length > 0 &&
             !geocoding &&
             !routeMode && (
-              <div className="absolute bottom-4 left-4 z-[1000] bg-[#0d1117]/90 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-400">
-                {leadsWithAddress.length - plottable.length} address
-                {leadsWithAddress.length - plottable.length !== 1 ? "es" : ""}{" "}
+              <div className="fixed bottom-4 left-4 z-[49] bg-[#0d1117]/90 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-400">
+                {leadsWithAddress.length - plottable.length - failed.length}{" "}
+                address
+                {leadsWithAddress.length - plottable.length - failed.length !==
+                1
+                  ? "es"
+                  : ""}{" "}
                 not yet plotted
                 {unresolved.length > 0 && (
                   <button
@@ -578,6 +587,27 @@ export default function Map() {
                 )}
               </div>
             )}
+
+          {/* Failed badge */}
+          {failed.length > 0 && !routeMode && (
+            <div className="fixed bottom-16 left-4 z-[49] bg-[#0d1117]/90 border border-amber-900/50 rounded-lg px-3 py-2 text-xs text-amber-400 space-y-1">
+              <p>
+                {failed.length} address{failed.length !== 1 ? "es" : ""} not
+                found on OpenStreetMap
+              </p>
+              {failed.map((l) => (
+                <a
+                  key={l.id}
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`}
+                  target={`_blank`}
+                  rel={`noreferrer`}
+                  className={`block text-amber-500 hover:text-amber-300 truncate transition-colors`}
+                >
+                  ↗ {l.businessName}
+                </a>
+              ))}
+            </div>
+          )}
 
           {/* Route mode hint */}
           {routeMode && route.length === 0 && (

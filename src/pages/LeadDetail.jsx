@@ -124,6 +124,7 @@ export default function LeadDetail() {
   const updateLead = useCRMStore((s) => s.updateLead);
   const deleteNoteEntry = useCRMStore((s) => s.deleteNoteEntry);
   const logTouchpoint = useCRMStore((s) => s.logTouchpoint);
+  const geocache = useCRMStore((s) => s.geocache) ?? {};
 
   const lead = leads.find((l) => l.id === id);
 
@@ -248,6 +249,35 @@ export default function LeadDetail() {
           <Field label="Phone" value={lead.phone} />
           <Field label="Email" value={lead.email} />
           <Field label="Address" value={lead.address} />
+          {lead.address && geocache[lead.address] === null && (
+            <div className="col-span-full">
+              <p className="text-xs text-amber-500 flex items-center gap-1.5">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+                  />
+                </svg>
+                Address not found on OpenStreetMap —
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.address)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  open in Google Maps ↗
+                </a>
+              </p>
+            </div>
+          )}
           <Field label="Last Touch" value={lead.lastTouchDate} />
           <Field
             label="Follow-up"

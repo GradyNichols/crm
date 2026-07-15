@@ -275,6 +275,13 @@ const useCRMStore = create(
         set((s) => ({ geocache: { ...s.geocache, [address]: coords } }));
       },
 
+      // ── Home Base ──────────────────────────────────────────────────────────────
+      homeBase: null, // { address, lat, lng, manualCoords }
+
+      setHomeBase: (data) => {
+        set({ homeBase: data });
+      },
+
       // ── Backup / Restore ────────────────────────────────────────────────────
       restoreBackup: (data) => {
         set({
@@ -397,6 +404,7 @@ const useCRMStore = create(
         dailyPlan: s.dailyPlan,
         lastPlanDate: s.lastPlanDate,
         lastPlanSummary: s.lastPlanSummary,
+        homeBase: s.homeBase,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -420,6 +428,7 @@ const useCRMStore = create(
         dailyPlan: persisted.dailyPlan || [],
         lastPlanDate: persisted.lastPlanDate || null,
         lastPlanSummary: persisted.lastPlanSummary || [],
+        homeBase: persisted.homeBase || null,
       }),
     },
   ),

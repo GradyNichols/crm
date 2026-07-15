@@ -44,6 +44,232 @@ function makeIcon(color, label) {
   });
 }
 
+function makeHomeIcon() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+    <circle cx="18" cy="18" r="18" fill="#0f172a" stroke="#3b82f6" stroke-width="2"/>
+    <path d="M18 8L8 17h3v9h6v-6h2v6h6v-9h3L18 8z" fill="#3b82f6"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: "",
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
+  });
+}
+
+// ── Home Base Modal ───────────────────────────────────────────────────────────────
+function HomeBaseModal({ current, onSave, onClose }) {
+  const [mode, setMode] = useState(
+    current?.manualCoords ? "coords" : "address",
+  );
+  const [address, setAddress] = useState(current?.address || "");
+  const [lat, setLat] = useState(current?.lat ? String(current.lat) : "");
+  const [lng, setLng] = useState(current?.lng ? String(current.lng) : "");
+  const [geocoding, setGeocoding] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSave = async () => {
+    setError("");
+    if (mode === "address") {
+      if (!address.trim()) {
+        setError("Enter an address.");
+        return;
+      }
+      setGeocoding(true);
+      const coords = await geocodeAddress(address.trim());
+      setGeocoding(false);
+      if (!coords) {
+        setError(
+          "Address not found. Try entering coordinates manually instead.",
+        );
+        return;
+      }
+      onSave({
+        address: address.trim(),
+        lat: coords.lat,
+        lng: coords.lng,
+        manualCoords: false,
+      });
+    } else {
+      const latN = parseFloat(lat);
+      const lngN = parseFloat(lng);
+      if (isNaN(latN) || isNaN(lngN)) {
+        setError("Enter valid coordinates.");
+        return;
+      }
+      onSave({
+        address: address.trim() || "Home Base",
+        lat: latN,
+        lng: lngN,
+        manualCoords: true,
+      });
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-sm bg-[#0d1117] border border-slate-700 rounded-xl shadow-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-slate-100 font-semibold text-base">
+            Set Home Base
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18 18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Mode toggle */}
+        <div className="flex rounded-lg border border-slate-700 overflow-hidden text-sm">
+          <button
+            onClick={() => setMode("address")}
+            className={`flex-1 py-2 transition-colors ${mode === "address" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+          >
+            Address
+          </button>
+          <button
+            onClick={() => setMode("coords")}
+            className={`flex-1 py-2 transition-colors ${mode === "coords" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+          >
+            Coordinates
+          </button>
+        </div>
+
+        {mode === "address" ? (
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Address
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={address}
+              onChange={(e) => {
+                setAddress(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave();
+              }}
+              placeholder="e.g. 1234 Elm St, Simi Valley, CA"
+              className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Label (optional)
+              </label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Home Base"
+                className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Latitude
+                </label>
+                <input
+                  autoFocus
+                  type="number"
+                  step="any"
+                  value={lat}
+                  onChange={(e) => {
+                    setLat(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="34.2694"
+                  className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Longitude
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={lng}
+                  onChange={(e) => {
+                    setLng(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="-118.7815"
+                  className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-slate-600">
+              Long-press any location in{" "}
+              <a
+                href="https://maps.google.com"
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-400 hover:text-blue-300"
+              >
+                Google Maps
+              </a>{" "}
+              to get coordinates.
+            </p>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+
+        <div className="flex gap-2 justify-end pt-1">
+          {current && (
+            <button
+              onClick={() => onSave(null)}
+              className="text-sm text-red-500 hover:text-red-400 px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors mr-auto"
+            >
+              Remove
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={geocoding}
+            className="text-sm font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2 rounded-lg transition-colors"
+          >
+            {geocoding ? "Finding…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function geocodeAddress(address) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
   const res = await fetch(url, { headers: { "Accept-Language": "en" } });
@@ -77,6 +303,7 @@ function RoutePanel({
   onMove,
   onClear,
   onNavigate,
+  homeBase,
 }) {
   if (route.length === 0) {
     return (
@@ -92,19 +319,25 @@ function RoutePanel({
   }
 
   const buildMapsUrl = () => {
-    const addrs = route
+    const stopAddrs = route
       .map((id) => {
         const lead = leads.find((l) => l.id === id);
         return encodeURIComponent(lead?.address || "");
       })
       .filter(Boolean);
-    if (addrs.length === 0) return null;
-    if (addrs.length === 1)
-      return `https://www.google.com/maps/search/?api=1&query=${addrs[0]}`;
-    const origin = addrs[0];
-    const dest = addrs[addrs.length - 1];
-    const waypoints = addrs.slice(1, -1).join("|");
-    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${waypoints ? `&waypoints=${waypoints}` : ""}&travelmode=driving`;
+    if (stopAddrs.length === 0) return null;
+
+    // Use home base as origin if available, otherwise first stop
+    const originAddr = homeBase
+      ? encodeURIComponent(homeBase.address)
+      : stopAddrs[0];
+    const allStops = homeBase ? stopAddrs : stopAddrs.slice(1);
+    const dest = allStops[allStops.length - 1] || originAddr;
+    const waypoints = allStops.slice(0, -1).join("|");
+
+    if (allStops.length === 0)
+      return `https://www.google.com/maps/search/?api=1&query=${originAddr}`;
+    return `https://www.google.com/maps/dir/?api=1&origin=${originAddr}&destination=${dest}${waypoints ? `&waypoints=${waypoints}` : ""}&travelmode=driving`;
   };
 
   return (
@@ -238,13 +471,16 @@ export default function Map() {
   const geocache = useCRMStore((s) => s.geocache) ?? {};
   const setGeocode = useCRMStore((s) => s.setGeocode);
   const updateLead = useCRMStore((s) => s.updateLead);
+  const homeBase = useCRMStore((s) => s.homeBase) ?? null;
+  const setHomeBase = useCRMStore.getState().setHomeBase;
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [geocoding, setGeocoding] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [resolved, setResolved] = useState({});
   const [routeMode, setRouteMode] = useState(false);
-  const [route, setRoute] = useState([]); // ordered lead IDs
+  const [route, setRoute] = useState([]);
+  const [showHomeModal, setShowHomeModal] = useState(false);
   const cancelRef = useRef(false);
 
   const leadsWithAddress = leads.filter((l) => l.address?.trim());
@@ -351,6 +587,19 @@ export default function Map() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Home base button */}
+          <button
+            onClick={() => setShowHomeModal(true)}
+            className={`text-sm font-medium px-4 py-1.5 rounded-lg transition-colors border ${
+              homeBase
+                ? "border-blue-700 text-blue-400 hover:border-blue-500"
+                : "border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500"
+            }`}
+            title={homeBase ? `Home: ${homeBase.address}` : "Set home base"}
+          >
+            {homeBase ? "⌂ Home Set" : "⌂ Set Home"}
+          </button>
+
           {/* Route mode toggle */}
           <button
             onClick={() => {
@@ -469,6 +718,29 @@ export default function Map() {
               />
             )}
 
+            {/* Home base pin */}
+            {homeBase && (
+              <Marker
+                position={[homeBase.lat, homeBase.lng]}
+                icon={makeHomeIcon()}
+              >
+                <Popup>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-sm text-slate-100">
+                      ⌂ Home Base
+                    </p>
+                    <p className="text-slate-400 text-xs">{homeBase.address}</p>
+                    <button
+                      onClick={() => setShowHomeModal(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      Edit →
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+
             {plottable.map((lead) => {
               const coords = resolved[lead.id];
               const inRoute = route.includes(lead.id);
@@ -562,6 +834,7 @@ export default function Map() {
               onRemove={(id) => setRoute((r) => r.filter((x) => x !== id))}
               onMove={moveRouteStop}
               onClear={() => setRoute([])}
+              homeBase={homeBase}
             />
           )}
 
@@ -616,6 +889,18 @@ export default function Map() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Home base modal */}
+      {showHomeModal && (
+        <HomeBaseModal
+          current={homeBase}
+          onSave={(data) => {
+            setHomeBase(data);
+            setShowHomeModal(false);
+          }}
+          onClose={() => setShowHomeModal(false)}
+        />
       )}
     </div>
   );

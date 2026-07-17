@@ -32,6 +32,99 @@ function formatDuration(seconds) {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
+const SPEED_STYLES = {
+  bad: {
+    bg: "bg-red-950/40",
+    border: "border-red-800",
+    text: "text-red-400",
+    label: "SLOW",
+  },
+  warn: {
+    bg: "bg-amber-950/30",
+    border: "border-amber-800",
+    text: "text-amber-400",
+    label: "NEEDS WORK",
+  },
+  good: {
+    bg: "bg-green-950/30",
+    border: "border-green-800",
+    text: "text-green-400",
+    label: "FAST",
+  },
+};
+
+function PageSpeedPanel({ website, cached, onCheck, checking, error }) {
+  if (!website) return null;
+
+  const style = cached ? SPEED_STYLES[cached.status] : null;
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+          Site Speed
+        </p>
+        <button
+          onClick={onCheck}
+          disabled={checking}
+          className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {checking ? "Checking…" : cached ? "Re-check" : "Check Speed"}
+        </button>
+      </div>
+
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {cached && !checking && (
+        <div
+          className={`rounded-xl border-2 ${style.border} ${style.bg} px-5 py-4 flex items-center justify-between`}
+        >
+          <div>
+            <p className={`text-3xl font-black tabular-nums ${style.text}`}>
+              {cached.lcp !== null ? `${cached.lcp}s` : "—"}
+            </p>
+            <p
+              className={`text-xs font-bold tracking-widest mt-1 ${style.text}`}
+            >
+              {style.label} · LCP
+            </p>
+          </div>
+          <div className="text-right">
+            <p className={`text-2xl font-bold tabular-nums ${style.text}`}>
+              {cached.score}
+            </p>
+            <p className="text-xs text-slate-600 mt-1">Perf Score</p>
+          </div>
+        </div>
+      )}
+
+      {cached && !checking && (
+        <p className="text-xs text-slate-700">
+          Checked{" "}
+          {new Date(cached.checkedAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })}
+        </p>
+      )}
+
+      {!cached && !checking && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/20 px-5 py-4 text-center">
+          <p className="text-slate-600 text-sm">No speed data yet.</p>
+        </div>
+      )}
+
+      {checking && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/20 px-5 py-6 text-center">
+          <p className="text-slate-500 text-sm animate-pulse">
+            Running PageSpeed check…
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CallTimer({ onLog }) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -125,6 +218,8 @@ export default function LeadDetail() {
   const deleteNoteEntry = useCRMStore((s) => s.deleteNoteEntry);
   const logTouchpoint = useCRMStore((s) => s.logTouchpoint);
   const geocache = useCRMStore((s) => s.geocache) ?? {};
+  const pageSpeedCache = useCRMStore((s) => s.pageSpeedCache) ?? {};
+  const setPageSpeed = useCRMStore.getState().setPageSpeed;
 
   const lead = leads.find((l) => l.id === id);
 
@@ -132,6 +227,8 @@ export default function LeadDetail() {
   const [note, setNote] = useState("");
   const [noteType, setNoteType] = useState("Phone Call");
   const [noteAdded, setNoteAdded] = useState(false);
+  const [speedChecking, setSpeedChecking] = useState(false);
+  const [speedError, setSpeedError] = useState("");
 
   if (!lead) {
     return (
@@ -168,6 +265,26 @@ export default function LeadDetail() {
   const handleSave = (form) => {
     updateLead(lead.id, form);
     setShowModal(false);
+  };
+
+  const handleCheckSpeed = async () => {
+    if (!lead.website?.trim()) return;
+    setSpeedChecking(true);
+    setSpeedError("");
+    try {
+      const res = await fetch("/api/pagespeed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: lead.website.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Check failed");
+      setPageSpeed(lead.website.trim(), data);
+    } catch (err) {
+      setSpeedError(err.message);
+    } finally {
+      setSpeedChecking(false);
+    }
   };
 
   const notesLog = [...(lead.notesLog || [])].reverse();
@@ -249,6 +366,25 @@ export default function LeadDetail() {
           <Field label="Phone" value={lead.phone} />
           <Field label="Email" value={lead.email} />
           <Field label="Address" value={lead.address} />
+          {lead.website && (
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                Website
+              </p>
+              <a
+                href={
+                  lead.website.startsWith("http")
+                    ? lead.website
+                    : `https://${lead.website}`
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-400 hover:text-blue-300 text-sm transition-colors break-all"
+              >
+                {lead.website} ↗
+              </a>
+            </div>
+          )}
           {lead.address && geocache[lead.address] === null && (
             <div className="col-span-full">
               <p className="text-xs text-amber-500 flex items-center gap-1.5">
@@ -310,6 +446,15 @@ export default function LeadDetail() {
               })}
             </section>
           )}
+
+        {/* Site speed */}
+        <PageSpeedPanel
+          website={lead.website}
+          cached={pageSpeedCache[lead.website?.trim()]}
+          onCheck={handleCheckSpeed}
+          checking={speedChecking}
+          error={speedError}
+        />
 
         {/* Log a Touchpoint */}
         <section className="space-y-3">

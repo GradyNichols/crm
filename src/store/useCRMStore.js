@@ -141,7 +141,6 @@ const useCRMStore = create(
       deleteGroup: (groupId) => {
         set((s) => ({
           groups: s.groups.filter((g) => g.id !== groupId),
-          // Unassign all leads in this group
           leads: s.leads.map((l) =>
             l.groupId === groupId ? { ...l, groupId: null } : l,
           ),
@@ -257,7 +256,6 @@ const useCRMStore = create(
       },
 
       // ── Geocache ────────────────────────────────────────────────────────────
-      // Stores { address: { lat, lng } } to avoid re-geocoding the same address
       geocache: {},
 
       notifSettings: {
@@ -276,10 +274,18 @@ const useCRMStore = create(
       },
 
       // ── Home Base ──────────────────────────────────────────────────────────────
-      homeBase: null, // { address, lat, lng, manualCoords }
+      homeBase: null,
 
       setHomeBase: (data) => {
         set({ homeBase: data });
+      },
+
+      // ── PageSpeed ─────────────────────────────────────────────────────────────
+      // Stores { url: { score, lcp, status, checkedAt } }
+      pageSpeedCache: {},
+
+      setPageSpeed: (url, data) => {
+        set((s) => ({ pageSpeedCache: { ...s.pageSpeedCache, [url]: data } }));
       },
 
       // ── Backup / Restore ────────────────────────────────────────────────────
@@ -296,6 +302,7 @@ const useCRMStore = create(
             overdue: true,
             stale: true,
           },
+          pageSpeedCache: data.pageSpeedCache || {},
         });
       },
 
@@ -326,9 +333,9 @@ const useCRMStore = create(
       },
 
       // ── Daily Plan ──────────────────────────────────────────────────────────────
-      dailyPlan: [], // [{ leadId, checkedAt: null | 'ISO date' }]
-      lastPlanDate: null, // 'YYYY-MM-DD'
-      lastPlanSummary: [], // copy of checked items from previous day
+      dailyPlan: [],
+      lastPlanDate: null,
+      lastPlanSummary: [],
 
       addToPlan: (leadId) => {
         set((s) => {
@@ -399,12 +406,12 @@ const useCRMStore = create(
         sortDir: s.sortDir,
         refSections: s.refSections,
         geocache: s.geocache,
-        notificationSettings: s.notificationSettings,
         notifSettings: s.notifSettings,
         dailyPlan: s.dailyPlan,
         lastPlanDate: s.lastPlanDate,
         lastPlanSummary: s.lastPlanSummary,
         homeBase: s.homeBase,
+        pageSpeedCache: s.pageSpeedCache,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -413,12 +420,6 @@ const useCRMStore = create(
         groups: persisted.groups || [],
         refSections: persisted.refSections || [],
         geocache: persisted.geocache || {},
-        notificationSettings: persisted.notificationSettings || {
-          enabled: false,
-          overdue: true,
-          dueToday: true,
-          stale: true,
-        },
         notifSettings: persisted.notifSettings || {
           enabled: false,
           summary: true,
@@ -429,6 +430,7 @@ const useCRMStore = create(
         lastPlanDate: persisted.lastPlanDate || null,
         lastPlanSummary: persisted.lastPlanSummary || [],
         homeBase: persisted.homeBase || null,
+        pageSpeedCache: persisted.pageSpeedCache || {},
       }),
     },
   ),

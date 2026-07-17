@@ -11,6 +11,38 @@ function formatDuration(seconds) {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
+const SPEED_STYLES = {
+  bad: { bg: "bg-red-600", ring: "ring-red-400", label: "SLOW SITE" },
+  warn: { bg: "bg-amber-600", ring: "ring-amber-400", label: "NEEDS WORK" },
+  good: { bg: "bg-green-600", ring: "ring-green-400", label: "FAST SITE" },
+};
+
+// ── Big speed indicator ─────────────────────────────────────────────────────────
+function SpeedFlashBanner({ cached }) {
+  if (!cached) return null;
+  const style = SPEED_STYLES[cached.status];
+  return (
+    <div
+      className={`mx-6 mb-5 rounded-2xl ${style.bg} ring-4 ${style.ring} px-5 py-4 flex items-center justify-between shrink-0 shadow-lg`}
+    >
+      <div>
+        <p className="text-white text-4xl font-black tabular-nums leading-none">
+          {cached.lcp !== null ? `${cached.lcp}s` : "—"}
+        </p>
+        <p className="text-white/90 text-xs font-bold tracking-widest mt-1.5">
+          {style.label} · LCP
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="text-white text-3xl font-bold tabular-nums leading-none">
+          {cached.score}
+        </p>
+        <p className="text-white/80 text-xs mt-1.5">Perf Score</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Win/Loss modal ───────────────────────────────────────────────────────────────
 function WinLossModal({ status, leadName, onConfirm, onCancel }) {
   const [reason, setReason] = useState("");
@@ -117,6 +149,7 @@ export default function CallPrep() {
   const leads = useCRMStore((s) => s.leads) ?? [];
   const updateLead = useCRMStore((s) => s.updateLead);
   const logTouchpoint = useCRMStore.getState().logTouchpoint;
+  const pageSpeedCache = useCRMStore((s) => s.pageSpeedCache) ?? {};
 
   const lead = leads.find((l) => l.id === id);
 
@@ -276,6 +309,11 @@ export default function CallPrep() {
             )}
           </div>
         </div>
+
+        {/* Site speed — big flash indicator */}
+        <SpeedFlashBanner
+          cached={lead.website ? pageSpeedCache[lead.website.trim()] : null}
+        />
 
         {/* Last note */}
         {lastNote && (

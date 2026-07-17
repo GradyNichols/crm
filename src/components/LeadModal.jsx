@@ -8,6 +8,7 @@ const EMPTY_FORM = {
   phone: "",
   email: "",
   address: "",
+  website: "",
   type: "Phone Call",
   strength: 3,
   status: "Cold",
@@ -207,6 +208,16 @@ export default function LeadModal({ onClose, onSave, existing }) {
               value={form.address}
               onChange={(e) => set("address", e.target.value)}
               placeholder="123 Main St, Simi Valley"
+              className={inputClass()}
+            />
+          </Field>
+
+          <Field label="Website">
+            <input
+              type="text"
+              value={form.website}
+              onChange={(e) => set("website", e.target.value)}
+              placeholder="restaurant.com (or leave blank if none)"
               className={inputClass()}
             />
           </Field>

@@ -947,7 +947,7 @@ export default function App() {
       </Routes>
 
       {/* Mobile bottom spacer — pushes content above fixed nav */}
-      <div className="sm:hidden h-32" />
+      <div className="sm:hidden h-24" />
 
       {/* Mobile FAB — only on dashboard */}
       {isDashboard && (

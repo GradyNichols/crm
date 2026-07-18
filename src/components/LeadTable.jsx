@@ -416,6 +416,26 @@ export default function LeadTable({
     return 0;
   });
 
+  // ── Pagination ──────────────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
+  const totalPages =
+    pageSize === "all" ? 1 : Math.max(1, Math.ceil(sorted.length / pageSize));
+
+  useEffect(() => {
+    setPage(1);
+  }, [leads.length, sortKey, sortDir, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages]);
+
+  const paginated =
+    pageSize === "all"
+      ? sorted
+      : sorted.slice((page - 1) * pageSize, page * pageSize);
+
   const toggleSelect = (id) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -424,9 +444,9 @@ export default function LeadTable({
     });
   const toggleAll = () =>
     setSelected((prev) =>
-      prev.size === sorted.length
-        ? new Set()
-        : new Set(sorted.map((l) => l.id)),
+      paginated.every((l) => prev.has(l.id))
+        ? new Set([...prev].filter((id) => !paginated.some((l) => l.id === id)))
+        : new Set([...prev, ...paginated.map((l) => l.id)]),
     );
   const clearSelect = () => setSelected(new Set());
 
@@ -491,7 +511,7 @@ export default function LeadTable({
     <>
       <div className="rounded-xl border border-slate-800 overflow-hidden">
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto scrollbar-none">
           <table className="w-full text-base">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/80">
@@ -499,7 +519,8 @@ export default function LeadTable({
                   <th className="pl-5 py-4 w-8">
                     <Checkbox
                       checked={
-                        sorted.length > 0 && selected.size === sorted.length
+                        paginated.length > 0 &&
+                        paginated.every((l) => selected.has(l.id))
                       }
                       onChange={toggleAll}
                     />
@@ -522,7 +543,7 @@ export default function LeadTable({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((lead, i) => (
+              {paginated.map((lead, i) => (
                 <React.Fragment key={lead.id}>
                   <tr
                     onClick={() =>
@@ -705,7 +726,7 @@ export default function LeadTable({
 
         {/* Mobile cards */}
         <div className="md:hidden divide-y divide-slate-800">
-          {sorted.map((lead) => (
+          {paginated.map((lead) => (
             <div
               key={lead.id}
               className={`p-5 space-y-2.5 cursor-pointer hover:bg-slate-800/30 transition-colors ${selected.has(lead.id) ? "bg-blue-950/20" : ""}`}
@@ -842,6 +863,122 @@ export default function LeadTable({
           )}
         </div>
       </div>
+
+      {/* Pagination controls */}
+      {sorted.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3 mt-4 pb-0 sm:pb-2">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span>
+              {pageSize === "all"
+                ? `Showing all ${sorted.length}`
+                : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, sorted.length)} of ${sorted.length}`}
+            </span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPageSize(v === "all" ? "all" : Number(v));
+              }}
+              className="appearance-none bg-slate-800/60 border border-slate-700 text-slate-400 text-xs rounded-lg pl-2 pr-6 py-1 focus:outline-none focus:border-blue-500 transition-colors ml-1 bg-no-repeat"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E")`,
+                backgroundPosition: "right 0.4rem center",
+                backgroundSize: "0.9em",
+              }}
+            >
+              <option value={25}>25 / page</option>
+              <option value={50}>50 / page</option>
+              <option value={100}>100 / page</option>
+              <option value="all">Show all</option>
+            </select>
+          </div>
+
+          {pageSize !== "all" && totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.75 19.5 8.25 12l7.5-7.5"
+                  />
+                </svg>
+              </button>
+
+              {/* Page number buttons — compact window around current page */}
+              {(() => {
+                const nums = [];
+                const windowSize = 1;
+                for (let n = 1; n <= totalPages; n++) {
+                  if (
+                    n === 1 ||
+                    n === totalPages ||
+                    (n >= page - windowSize && n <= page + windowSize)
+                  ) {
+                    nums.push(n);
+                  } else if (nums[nums.length - 1] !== "…") {
+                    nums.push("…");
+                  }
+                }
+                return nums.map((n, i) =>
+                  n === "…" ? (
+                    <span
+                      key={`ellipsis-${i}`}
+                      className="px-1.5 text-slate-700 text-sm"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      onClick={() => setPage(n)}
+                      className={`min-w-[2rem] px-2 py-1 rounded-lg text-sm font-medium transition-colors ${
+                        n === page
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-500 hover:text-slate-200 hover:bg-slate-800"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ),
+                );
+              })()}
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m8.25 4.5 7.5 7.5-7.5 7.5"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bulk toolbar */}
       {selectMode && selected.size > 0 && (

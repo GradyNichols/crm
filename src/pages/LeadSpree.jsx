@@ -35,6 +35,14 @@ const FIXED_STEPS = [
     skippable: true,
   },
   {
+    key: "website",
+    label: "Website",
+    type: "text",
+    required: false,
+    placeholder: "restaurant.com (or leave blank if none)",
+    skippable: true,
+  },
+  {
     key: "type",
     label: "Outreach Type",
     type: "select",
@@ -71,6 +79,7 @@ const EMPTY_FIXED = {
   phone: "",
   ownerName: "",
   address: "",
+  website: "",
   type: "Phone Call",
   status: "Cold",
   strength: 3,

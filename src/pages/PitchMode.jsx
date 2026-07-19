@@ -377,9 +377,9 @@ export default function PitchMode() {
   };
 
   return (
-    <div className="px-4 sm:px-6 pb-24 sm:pb-4 pt-24 mx-auto fixed left-0 right-0 max-w-3xl inset-0 bg-[#03060f] flex flex-col overflow-x-hidden overflow-y-scroll scrollbar-none">
+    <div className="px-4 sm:px-6 pb-24 sm:pb-4 pt-24 mx-auto fixed left-0 right-0 max-w-3xl inset-0 bg-[#03060f] flex flex-col overflow-hidden">
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-5">
+      <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-5 scrollbar-none">
         {/* Header */}
         <div className="flex items-center justify-between px-0 pt-6 pb-4 shrink-0">
           <button

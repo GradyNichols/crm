@@ -155,7 +155,7 @@ function FinishPitchModal({ lead, onSave, onCancel }) {
   const selected = INTEREST_OPTIONS.find((o) => o.key === interested);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div className="fixed my-auto bottom-24 sm:bottom-0 top-0 mt-14 sm:pt-0 inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="w-full sm:max-w-md bg-[#0d1117] border border-slate-700 sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] overflow-y-auto">
         <div className="px-6 py-5 space-y-5">
           <div>

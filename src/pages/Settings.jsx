@@ -93,6 +93,85 @@ function exportBackup(state) {
   URL.revokeObjectURL(url);
 }
 
+function DeleteAllDataModal({ onConfirm, onCancel }) {
+  const [confirmText, setConfirmText] = useState("");
+  const canDelete = confirmText.trim().toUpperCase() === "DELETE";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div className="w-full max-w-sm bg-[#0d1117] border border-red-900/50 rounded-xl shadow-2xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-full bg-red-950 flex items-center justify-center shrink-0">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5 text-red-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-slate-100 font-semibold text-base">
+              Delete all data?
+            </h3>
+            <p className="text-slate-500 text-sm mt-0.5">
+              This cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <p className="text-slate-400 text-sm mb-4">
+          This permanently deletes every lead, group, custom column, reference
+          section, daily plan, and setting. Consider exporting a backup first
+          from the Data Backup section above.
+        </p>
+
+        <div className="space-y-1.5 mb-5">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Type <span className="text-red-400">DELETE</span> to confirm
+          </label>
+          <input
+            autoFocus
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="DELETE"
+            className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-700 focus:outline-none focus:border-red-500 transition-colors"
+          />
+        </div>
+
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!canDelete}
+            className="text-sm font-medium bg-red-700 hover:bg-red-600 disabled:opacity-30 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg transition-colors"
+          >
+            Delete Everything
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -102,6 +181,7 @@ export default function Settings() {
   const groups = useCRMStore((s) => s.groups) ?? [];
   const { addGroup, renameGroup, deleteGroup, restoreBackup, mergeBackup } =
     useCRMStore.getState();
+  const resetAllData = useCRMStore.getState().resetAllData;
   const notifSettings = useCRMStore((s) => s.notifSettings) ?? {};
   const setNotificationSettings = useCRMStore.getState().setNotifSettings;
   const portfolioUrl = useCRMStore((s) => s.portfolioUrl) ?? "";
@@ -124,6 +204,7 @@ export default function Settings() {
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [editingGroupName, setEditingGroupName] = useState("");
   const [deleteGroupTarget, setDeleteGroupTarget] = useState(null);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
 
   useEffect(() => {
     const action = searchParams.get("action");
@@ -870,6 +951,30 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* ── Danger Zone ── */}
+      <section>
+        <h3 className="text-xs font-semibold text-red-500 uppercase tracking-widest mb-4">
+          Danger Zone
+        </h3>
+        <div className="rounded-xl border border-red-900/40 bg-red-950/10 px-5 py-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-slate-200 text-sm font-medium">
+              Delete all data
+            </p>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Permanently erases every lead, group, column, and setting from
+              this device.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowDeleteAll(true)}
+            className="shrink-0 text-sm font-medium bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Delete Data
+          </button>
+        </div>
+      </section>
+
       {/* Delete group modal */}
       {deleteGroupTarget && (
         <DeleteConfirmModal
@@ -892,6 +997,17 @@ export default function Settings() {
             setDeleteTarget(null);
           }}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+      {/* Delete all data modal */}
+      {showDeleteAll && (
+        <DeleteAllDataModal
+          onConfirm={() => {
+            resetAllData();
+            setShowDeleteAll(false);
+            navigate("/");
+          }}
+          onCancel={() => setShowDeleteAll(false)}
         />
       )}
     </main>

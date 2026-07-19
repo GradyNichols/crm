@@ -425,6 +425,31 @@ const useCRMStore = create(
       dismissPlanSummary: () => {
         set({ lastPlanSummary: [] });
       },
+
+      // ── Danger Zone ─────────────────────────────────────────────────────────
+      resetAllData: () => {
+        set({
+          leads: [],
+          customColumns: [],
+          groups: [],
+          sortKey: "followUpDate",
+          sortDir: "asc",
+          refSections: [],
+          geocache: {},
+          notifSettings: {
+            enabled: false,
+            summary: true,
+            overdue: true,
+            stale: true,
+          },
+          dailyPlan: [],
+          lastPlanDate: null,
+          lastPlanSummary: [],
+          homeBase: null,
+          pageSpeedCache: {},
+          portfolioUrl: "",
+        });
+      },
     }),
     {
       name: "crm_leads",

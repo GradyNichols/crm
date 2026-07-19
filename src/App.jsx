@@ -26,6 +26,7 @@ import { useNotifications, requestPermission } from "./hooks/useNotifications";
 import Progress from "./pages/Progress";
 import CallPrep from "./pages/CallPrep";
 import DailyPlan from "./pages/DailyPlan";
+import PitchMode from "./pages/PitchMode";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 
@@ -944,6 +945,7 @@ export default function App() {
         <Route path="/map" element={<Map />} />
         <Route path="/call/:id" element={<CallPrep />} />
         <Route path="/plan" element={<DailyPlan />} />
+        <Route path="/pitch/:id" element={<PitchMode />} />
       </Routes>
 
       {/* Mobile bottom spacer — pushes content above fixed nav */}

@@ -208,7 +208,12 @@ const useCRMStore = create(
                   ...sec,
                   cards: [
                     ...sec.cards,
-                    { id: id("card"), title: title.trim(), body: body.trim() },
+                    {
+                      id: id("card"),
+                      title: title.trim(),
+                      body: body.trim(),
+                      isPitchScript: false,
+                    },
                   ],
                 }
               : sec,
@@ -255,6 +260,24 @@ const useCRMStore = create(
         }));
       },
 
+      // Marks/unmarks a reference card as usable inside Pitch Mode
+      togglePitchScript: (secId, cardId) => {
+        set((s) => ({
+          refSections: s.refSections.map((sec) =>
+            sec.id === secId
+              ? {
+                  ...sec,
+                  cards: sec.cards.map((c) =>
+                    c.id === cardId
+                      ? { ...c, isPitchScript: !c.isPitchScript }
+                      : c,
+                  ),
+                }
+              : sec,
+          ),
+        }));
+      },
+
       // ── Geocache ────────────────────────────────────────────────────────────
       geocache: {},
 
@@ -281,11 +304,17 @@ const useCRMStore = create(
       },
 
       // ── PageSpeed ─────────────────────────────────────────────────────────────
-      // Stores { url: { score, lcp, status, checkedAt } }
       pageSpeedCache: {},
 
       setPageSpeed: (url, data) => {
         set((s) => ({ pageSpeedCache: { ...s.pageSpeedCache, [url]: data } }));
+      },
+
+      // ── Pitch Mode ────────────────────────────────────────────────────────────
+      portfolioUrl: "",
+
+      setPortfolioUrl: (url) => {
+        set({ portfolioUrl: url });
       },
 
       // ── Backup / Restore ────────────────────────────────────────────────────
@@ -303,6 +332,7 @@ const useCRMStore = create(
             stale: true,
           },
           pageSpeedCache: data.pageSpeedCache || {},
+          portfolioUrl: data.portfolioUrl || "",
         });
       },
 
@@ -412,6 +442,7 @@ const useCRMStore = create(
         lastPlanSummary: s.lastPlanSummary,
         homeBase: s.homeBase,
         pageSpeedCache: s.pageSpeedCache,
+        portfolioUrl: s.portfolioUrl,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -431,6 +462,7 @@ const useCRMStore = create(
         lastPlanSummary: persisted.lastPlanSummary || [],
         homeBase: persisted.homeBase || null,
         pageSpeedCache: persisted.pageSpeedCache || {},
+        portfolioUrl: persisted.portfolioUrl || "",
       }),
     },
   ),

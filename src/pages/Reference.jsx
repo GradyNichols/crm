@@ -81,6 +81,25 @@ function IconTrash() {
   );
 }
 
+function IconPin({ filled }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-3.5 h-3.5"
+      fill={filled ? "currentColor" : "none"}
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+      />
+    </svg>
+  );
+}
+
 // ── Delete confirm modal ─────────────────────────────────────────────────────────
 
 function DeleteModal({ label, onConfirm, onCancel }) {
@@ -142,6 +161,7 @@ function RefCard({ card, secId, isFirst, isLast }) {
   const updateRefCard = useCRMStore((s) => s.updateRefCard);
   const deleteRefCard = useCRMStore((s) => s.deleteRefCard);
   const moveRefCard = useCRMStore((s) => s.moveRefCard);
+  const togglePitchScript = useCRMStore((s) => s.togglePitchScript);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: card.title, body: card.body });
   const [deleteTarget, setDeleteTarget] = useState(false);
@@ -213,8 +233,13 @@ function RefCard({ card, secId, isFirst, isLast }) {
               d="m8.25 4.5 7.5 7.5-7.5 7.5"
             />
           </svg>
-          <p className="text-slate-200 text-sm font-medium flex-1 select-none">
+          <p className="text-slate-200 text-sm font-medium flex-1 select-none flex items-center gap-2">
             {card.title}
+            {card.isPitchScript && (
+              <span className="text-[10px] font-semibold text-purple-400 border border-purple-900/50 px-1.5 py-0.5 rounded-full shrink-0">
+                PITCH
+              </span>
+            )}
           </p>
 
           {/* Action buttons — visible on hover */}
@@ -222,6 +247,21 @@ function RefCard({ card, secId, isFirst, isLast }) {
             className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              onClick={() => togglePitchScript(secId, card.id)}
+              className={`p-1 transition-colors ${
+                card.isPitchScript
+                  ? "text-purple-400"
+                  : "text-slate-600 hover:text-purple-400"
+              }`}
+              title={
+                card.isPitchScript
+                  ? "Remove from Pitch Mode"
+                  : "Use in Pitch Mode"
+              }
+            >
+              <IconPin filled={card.isPitchScript} />
+            </button>
             <button
               onClick={() => moveRefCard(secId, card.id, -1)}
               disabled={isFirst}

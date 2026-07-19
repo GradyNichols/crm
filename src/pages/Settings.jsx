@@ -79,6 +79,8 @@ function exportBackup(state) {
     refSections: state.refSections,
     geocache: state.geocache,
     notifSettings: state.notifSettings,
+    pageSpeedCache: state.pageSpeedCache,
+    portfolioUrl: state.portfolioUrl,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
@@ -102,6 +104,10 @@ export default function Settings() {
     useCRMStore.getState();
   const notifSettings = useCRMStore((s) => s.notifSettings) ?? {};
   const setNotificationSettings = useCRMStore.getState().setNotifSettings;
+  const portfolioUrl = useCRMStore((s) => s.portfolioUrl) ?? "";
+  const setPortfolioUrl = useCRMStore.getState().setPortfolioUrl;
+  const [portfolioDraft, setPortfolioDraft] = useState(portfolioUrl);
+  const [portfolioSaved, setPortfolioSaved] = useState(false);
   const [notifPermission, setNotifPermission] = useState(() =>
     "Notification" in window ? Notification.permission : "unsupported",
   );
@@ -136,6 +142,15 @@ export default function Settings() {
         () =>
           document
             .getElementById("columns-section")
+            ?.scrollIntoView({ behavior: "smooth" }),
+        100,
+      );
+      setSearchParams({}, { replace: true });
+    } else if (action === "pitch-mode") {
+      setTimeout(
+        () =>
+          document
+            .getElementById("pitch-section")
             ?.scrollIntoView({ behavior: "smooth" }),
         100,
       );
@@ -216,6 +231,64 @@ export default function Settings() {
           </p>
         </div>
       </div>
+
+      {/* ── Pitch Mode ── */}
+      <section id="pitch-section">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
+          Pitch Mode
+        </h3>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-5 py-5 space-y-3">
+          <div>
+            <p className="text-slate-200 text-sm font-medium">Portfolio URL</p>
+            <p className="text-slate-600 text-xs mt-0.5">
+              Shown as a one-tap link inside Pitch Mode for every lead.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={portfolioDraft}
+              onChange={(e) => {
+                setPortfolioDraft(e.target.value);
+                setPortfolioSaved(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setPortfolioUrl(portfolioDraft.trim());
+                  setPortfolioSaved(true);
+                  setTimeout(() => setPortfolioSaved(false), 1500);
+                }
+              }}
+              placeholder="yourportfolio.com"
+              className="flex-1 bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+            />
+            <button
+              onClick={() => {
+                setPortfolioUrl(portfolioDraft.trim());
+                setPortfolioSaved(true);
+                setTimeout(() => setPortfolioSaved(false), 1500);
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0 ${
+                portfolioSaved
+                  ? "bg-green-600 text-white"
+                  : "bg-blue-600 hover:bg-blue-500 text-white"
+              }`}
+            >
+              {portfolioSaved ? "✓ Saved" : "Save"}
+            </button>
+          </div>
+          <p className="text-xs text-slate-700">
+            To surface pitch scripts inside Pitch Mode, mark a{" "}
+            <a
+              href="/reference"
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Reference card
+            </a>{" "}
+            with the pin icon.
+          </p>
+        </div>
+      </section>
 
       {/* ── Data Backup ── */}
       <section id="backup-section">

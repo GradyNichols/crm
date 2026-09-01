@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS, STATUSES, OUTREACH_TYPES } from "../constants";
 
@@ -146,6 +146,7 @@ function WinLossModal({ status, leadName, onConfirm, onCancel }) {
 export default function CallPrep() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const leads = useCRMStore((s) => s.leads) ?? [];
   const updateLead = useCRMStore((s) => s.updateLead);
   const logTouchpoint = useCRMStore.getState().logTouchpoint;
@@ -232,7 +233,7 @@ export default function CallPrep() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-6 pb-4 shrink-0">
           <button
-            onClick={() => navigate(`/lead/${id}`)}
+            onClick={() => navigate(`/lead/${id}`, { state: location.state })}
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
           >
             <svg

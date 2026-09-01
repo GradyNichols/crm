@@ -121,6 +121,7 @@ export default function Search() {
                 <Link
                   key={lead.id}
                   to={`/lead/${lead.id}`}
+                  state={{ from: "/search" }}
                   className="block px-5 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">

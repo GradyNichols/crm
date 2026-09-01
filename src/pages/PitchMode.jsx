@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS } from "../constants";
 
@@ -274,6 +274,7 @@ function FinishPitchModal({ lead, onSave, onCancel }) {
 export default function PitchMode() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const leads = useCRMStore((s) => s.leads) ?? [];
   const refSections = useCRMStore((s) => s.refSections) ?? [];
@@ -383,7 +384,7 @@ export default function PitchMode() {
         {/* Header */}
         <div className="flex items-center justify-between px-0 pt-6 pb-4 shrink-0">
           <button
-            onClick={() => navigate(`/lead/${id}`)}
+            onClick={() => navigate(`/lead/${id}`, { state: location.state })}
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
           >
             <svg

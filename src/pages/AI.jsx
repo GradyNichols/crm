@@ -86,14 +86,35 @@ export default function AI() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const leads = useCRMStore((s) => s.leads) ?? [];
-  const [result, setResult] = useState(null);
+  const pipelineAnalysis = useCRMStore((s) => s.pipelineAnalysis);
+  const setPipelineAnalysis = useCRMStore.getState().setPipelineAnalysis;
+  const clearPipelineAnalysis = useCRMStore.getState().clearPipelineAnalysis;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const result = pipelineAnalysis?.result ?? null;
+
+  // Human-readable "how long ago" label
+  const analyzedAgo = (() => {
+    if (!pipelineAnalysis?.analyzedAt) return null;
+    const mins = Math.floor(
+      (Date.now() - new Date(pipelineAnalysis.analyzedAt)) / 60000,
+    );
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  })();
+
+  // True if leads changed since the analysis was run
+  const isStale =
+    pipelineAnalysis && pipelineAnalysis.leadCount !== leads.length;
 
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
-    setResult(null);
 
     try {
       const pipeline = formatPipeline(leads);
@@ -105,7 +126,11 @@ export default function AI() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unknown error");
-      setResult(data);
+      setPipelineAnalysis({
+        result: data,
+        analyzedAt: new Date().toISOString(),
+        leadCount: leads.length,
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -217,18 +242,42 @@ export default function AI() {
         )}
 
         {result && !loading && (
-          <p className="text-slate-500 text-sm">
-            Analysis complete. Run again anytime.
-          </p>
+          <div className="space-y-1">
+            <p className="text-slate-500 text-sm">
+              Analyzed {analyzedAgo}
+              {pipelineAnalysis?.leadCount != null && (
+                <span className="text-slate-600">
+                  {" "}
+                  · {pipelineAnalysis.leadCount} lead
+                  {pipelineAnalysis.leadCount !== 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+            {isStale && (
+              <p className="text-amber-500 text-xs">
+                Your pipeline has changed since this ran.
+              </p>
+            )}
+          </div>
         )}
 
-        <button
-          onClick={handleAnalyze}
-          disabled={loading || isEmpty}
-          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
-        >
-          {loading ? "Analyzing…" : result ? "Run Again" : "Analyze Pipeline"}
-        </button>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={handleAnalyze}
+            disabled={loading || isEmpty}
+            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
+          >
+            {loading ? "Analyzing…" : result ? "Run Again" : "Analyze Pipeline"}
+          </button>
+          {result && !loading && (
+            <button
+              onClick={clearPipelineAnalysis}
+              className="text-sm text-slate-500 hover:text-slate-300 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error */}

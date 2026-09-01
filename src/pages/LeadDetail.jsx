@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS, STATUSES, OUTREACH_TYPES } from "../constants";
 import LeadModal from "../components/LeadModal";
@@ -211,6 +211,11 @@ function CallTimer({ onLog }) {
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Where the back button should go — honors the origin passed via router
+  // state, falling back to the dashboard. Never uses history, so nested
+  // pages (Call Prep / Pitch Mode) can't create a back-navigation loop.
+  const backTo = location.state?.from || "/";
   const leads = useCRMStore((s) => s.leads) ?? [];
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const groups = useCRMStore((s) => s.groups) ?? [];
@@ -295,7 +300,7 @@ export default function LeadDetail() {
         {/* Header */}
         <div className="flex items-start gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(backTo)}
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors mt-1 shrink-0"
           >
             <svg
@@ -333,7 +338,9 @@ export default function LeadDetail() {
             </div>
           </div>
           <button
-            onClick={() => navigate(`/pitch/${lead.id}`)}
+            onClick={() =>
+              navigate(`/pitch/${lead.id}`, { state: location.state })
+            }
             className="shrink-0 text-sm text-purple-400 hover:text-purple-300 border border-purple-900/50 hover:border-purple-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
           >
             <svg
@@ -353,7 +360,9 @@ export default function LeadDetail() {
             Pitch
           </button>
           <button
-            onClick={() => navigate(`/call/${lead.id}`)}
+            onClick={() =>
+              navigate(`/call/${lead.id}`, { state: location.state })
+            }
             className="shrink-0 text-sm text-green-400 hover:text-green-300 border border-green-900/50 hover:border-green-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
           >
             <svg

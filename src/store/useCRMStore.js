@@ -317,6 +317,18 @@ const useCRMStore = create(
         set({ portfolioUrl: url });
       },
 
+      // ── Pipeline Advisor ──────────────────────────────────────────────────────
+      // Persisted so the analysis survives navigating away and back
+      pipelineAnalysis: null, // { result, analyzedAt, leadCount }
+
+      setPipelineAnalysis: (data) => {
+        set({ pipelineAnalysis: data });
+      },
+
+      clearPipelineAnalysis: () => {
+        set({ pipelineAnalysis: null });
+      },
+
       // ── Backup / Restore ────────────────────────────────────────────────────
       restoreBackup: (data) => {
         set({
@@ -448,6 +460,7 @@ const useCRMStore = create(
           homeBase: null,
           pageSpeedCache: {},
           portfolioUrl: "",
+          pipelineAnalysis: null,
         });
       },
     }),
@@ -468,6 +481,7 @@ const useCRMStore = create(
         homeBase: s.homeBase,
         pageSpeedCache: s.pageSpeedCache,
         portfolioUrl: s.portfolioUrl,
+        pipelineAnalysis: s.pipelineAnalysis,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -488,6 +502,7 @@ const useCRMStore = create(
         homeBase: persisted.homeBase || null,
         pageSpeedCache: persisted.pageSpeedCache || {},
         portfolioUrl: persisted.portfolioUrl || "",
+        pipelineAnalysis: persisted.pipelineAnalysis || null,
       }),
     },
   ),

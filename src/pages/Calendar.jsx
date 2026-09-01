@@ -278,7 +278,11 @@ export default function Calendar() {
                   className="flex items-center gap-3 px-4 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
                 >
                   <button
-                    onClick={() => navigate(`/lead/${lead.id}`)}
+                    onClick={() =>
+                      navigate(`/lead/${lead.id}`, {
+                        state: { from: "/calendar" },
+                      })
+                    }
                     className="flex-1 min-w-0 text-left"
                   >
                     <p className="text-slate-100 text-base font-medium truncate">

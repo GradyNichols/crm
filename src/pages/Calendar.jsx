@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS } from "../constants";
+import QueueButton, { QueueAllButton } from "../components/QueueButton";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -13,11 +14,64 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ── Hover preview ───────────────────────────────────────────────────────────────
+// Desktop affordance only — tapping a day is the primary interaction and is the
+// only one that exists on a phone. This just saves a click at a desk.
+// pointer-events-none so it can never swallow the click underneath it.
+function DayPreview({ leads, index }) {
+  const row = Math.floor(index / 7);
+  const col = index % 7;
+
+  // Flip above the cell for the bottom half of the grid, and pin to the edge
+  // for the outer columns so it can't run off the page.
+  const vertical = row >= 3 ? "bottom-full mb-1" : "top-full mt-1";
+  const horizontal =
+    col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
+
+  const shown = leads.slice(0, 6);
+
+  return (
+    <div
+      className={`hidden sm:block absolute z-30 w-56 pointer-events-none ${vertical} ${horizontal}`}
+    >
+      <div className="rounded-xl border border-slate-700 bg-[#0d1117] shadow-2xl px-3 py-2.5 space-y-1.5 text-left">
+        <p className="text-[0.7rem] font-semibold text-slate-500 uppercase tracking-widest">
+          {leads.length} follow-up{leads.length !== 1 ? "s" : ""}
+        </p>
+        {shown.map((l) => (
+          <div key={l.id} className="flex items-center gap-2">
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                l.status === "Warm"
+                  ? "bg-amber-400"
+                  : l.status === "Waiting"
+                    ? "bg-purple-400"
+                    : l.status === "Contacted"
+                      ? "bg-blue-400"
+                      : "bg-slate-500"
+              }`}
+            />
+            <span className="text-xs text-slate-300 truncate flex-1">
+              {l.businessName}
+            </span>
+            <span className="text-[0.65rem] text-slate-600 shrink-0">
+              {l.status}
+            </span>
+          </div>
+        ))}
+        {leads.length > shown.length && (
+          <p className="text-xs text-slate-600">
+            +{leads.length - shown.length} more
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Calendar() {
   const navigate = useNavigate();
   const leads = useCRMStore((s) => s.leads) ?? [];
-  const dailyPlan = useCRMStore((s) => s.dailyPlan) ?? [];
-  const addToPlan = useCRMStore.getState().addToPlan;
 
   const [viewDate, setViewDate] = useState(() => {
     const d = new Date();
@@ -25,6 +79,7 @@ export default function Calendar() {
     return d;
   });
   const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [hoveredIndex, setHoveredIndex] = useState(null);
 
   const today = todayKey();
 
@@ -39,8 +94,6 @@ export default function Calendar() {
     });
     return map;
   }, [leads]);
-
-  const planLeadIds = new Set(dailyPlan.map((i) => i.leadId));
 
   // ── Build the 6x7 month grid ─────────────────────────────────────────────────
   const grid = useMemo(() => {
@@ -83,6 +136,7 @@ export default function Calendar() {
     (a, b) => (b.strength || 0) - (a.strength || 0),
   );
   const isSelectedToday = selectedDate === today;
+  const isSelectedPast = selectedDate < today;
   const currentMonth = viewDate.getMonth();
 
   return (
@@ -185,9 +239,10 @@ export default function Calendar() {
         className="grid gap-1"
         style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}
       >
-        {grid.map((d) => {
+        {grid.map((d, i) => {
           const key = toKey(d);
-          const count = (byDate[key] || []).length;
+          const dayLeads = byDate[key] || [];
+          const count = dayLeads.length;
           const inCurrentMonth = d.getMonth() === currentMonth;
           const isToday = key === today;
           const isSelected = key === selectedDate;
@@ -202,6 +257,8 @@ export default function Calendar() {
             <button
               key={key}
               onClick={() => setSelectedDate(key)}
+              onMouseEnter={() => count > 0 && setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
               className={`min-h-[3.25rem] sm:min-h-[3.75rem] rounded-xl flex flex-col items-center justify-center gap-1 text-base sm:text-lg font-medium transition-colors relative ${
                 isSelected
                   ? "bg-blue-600 text-white font-semibold"
@@ -217,6 +274,9 @@ export default function Calendar() {
                 <span
                   className={`w-2 h-2 rounded-full ${isSelected ? "bg-white" : dotColor}`}
                 />
+              )}
+              {hoveredIndex === i && count > 0 && (
+                <DayPreview leads={dayLeads} index={i} />
               )}
             </button>
           );
@@ -237,8 +297,8 @@ export default function Calendar() {
 
       {/* Selected day panel */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-base font-semibold text-slate-300">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-base font-semibold text-slate-300 min-w-0">
             {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
               weekday: "long",
               month: "long",
@@ -249,19 +309,16 @@ export default function Calendar() {
                 (today)
               </span>
             )}
+            {isSelectedPast && selectedLeads.length > 0 && (
+              <span className="text-red-400 ml-2 text-sm font-normal">
+                (overdue)
+              </span>
+            )}
           </p>
-          {isSelectedToday && selectedLeads.length > 0 && (
-            <button
-              onClick={() => {
-                selectedLeads.forEach((l) => {
-                  if (!planLeadIds.has(l.id)) addToPlan(l.id);
-                });
-              }}
-              className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
-            >
-              + Add all to Plan
-            </button>
-          )}
+          {/* Queueing used to be gated to today's cell, which meant last week's
+              overdue follow-ups and next week's upcoming ones were both
+              read-only. Any day can feed today's work now. */}
+          <QueueAllButton leadIds={selectedLeads.map((l) => l.id)} />
         </div>
 
         {selectedLeads.length === 0 ? (
@@ -270,54 +327,39 @@ export default function Calendar() {
           </div>
         ) : (
           <div className="rounded-xl border border-slate-800 overflow-hidden divide-y divide-slate-800">
-            {selectedLeads.map((lead) => {
-              const inPlan = planLeadIds.has(lead.id);
-              return (
-                <div
-                  key={lead.id}
-                  className="flex items-center gap-3 px-4 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
+            {selectedLeads.map((lead) => (
+              <div
+                key={lead.id}
+                className="flex items-center gap-3 px-4 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
+              >
+                <button
+                  onClick={() =>
+                    navigate(`/lead/${lead.id}`, {
+                      state: { from: "/calendar" },
+                    })
+                  }
+                  className="flex-1 min-w-0 text-left"
                 >
-                  <button
-                    onClick={() =>
-                      navigate(`/lead/${lead.id}`, {
-                        state: { from: "/calendar" },
-                      })
-                    }
-                    className="flex-1 min-w-0 text-left"
-                  >
-                    <p className="text-slate-100 text-base font-medium truncate">
-                      {lead.businessName}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {lead.ownerName && (
-                        <span className="text-slate-500 text-sm">
-                          {lead.ownerName}
-                        </span>
-                      )}
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[lead.status] || ""}`}
-                      >
-                        {lead.status}
+                  <p className="text-slate-100 text-base font-medium truncate">
+                    {lead.businessName}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {lead.ownerName && (
+                      <span className="text-slate-500 text-sm">
+                        {lead.ownerName}
                       </span>
-                    </div>
-                  </button>
+                    )}
+                    <span
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[lead.status] || ""}`}
+                    >
+                      {lead.status}
+                    </span>
+                  </div>
+                </button>
 
-                  {isSelectedToday &&
-                    (inPlan ? (
-                      <span className="text-sm text-slate-600 shrink-0">
-                        ✓ In Plan
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => addToPlan(lead.id)}
-                        className="text-sm font-medium text-purple-400 hover:text-purple-300 border border-purple-900/50 hover:border-purple-700 px-3.5 py-2 rounded-lg transition-colors shrink-0"
-                      >
-                        + Plan
-                      </button>
-                    ))}
-                </div>
-              );
-            })}
+                <QueueButton leadId={lead.id} />
+              </div>
+            ))}
           </div>
         )}
       </div>

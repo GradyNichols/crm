@@ -1,90 +1,4 @@
-// Attempts to repair truncated JSON by closing any unterminated
-// strings, arrays, and objects. Returns null if unsalvageable.
-function repairTruncatedJSON(text) {
-  // Trim to the first opening brace
-  const start = text.indexOf("{");
-  if (start === -1) return null;
-  let s = text.slice(start);
-
-  // Walk the string tracking structural state
-  const stack = [];
-  let inString = false;
-  let escaped = false;
-  let lastSafeIndex = -1; // end of last complete top-level array/object element
-
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === "\\") {
-      if (inString) escaped = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-
-    if (ch === "{" || ch === "[") stack.push(ch);
-    else if (ch === "}" || ch === "]") {
-      stack.pop();
-      lastSafeIndex = i;
-    } else if (ch === "," && stack.length <= 2) {
-      lastSafeIndex = i;
-    }
-  }
-
-  // If it already parses, nothing to repair
-  try {
-    return JSON.parse(s);
-  } catch {}
-
-  // Cut back to the last structurally safe point, dropping a partial element
-  if (lastSafeIndex > -1) {
-    s = s.slice(0, lastSafeIndex + 1);
-    // Remove a dangling comma
-    s = s.replace(/,\s*$/, "");
-  } else if (inString) {
-    // Unterminated string with no safe point — close it
-    s += '"';
-  }
-
-  // Recompute what's still open after trimming
-  const closers = [];
-  let inStr2 = false;
-  let esc2 = false;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (esc2) {
-      esc2 = false;
-      continue;
-    }
-    if (ch === "\\") {
-      if (inStr2) esc2 = true;
-      continue;
-    }
-    if (ch === '"') {
-      inStr2 = !inStr2;
-      continue;
-    }
-    if (inStr2) continue;
-    if (ch === "{") closers.push("}");
-    else if (ch === "[") closers.push("]");
-    else if (ch === "}" || ch === "]") closers.pop();
-  }
-  if (inStr2) s += '"';
-  while (closers.length) s += closers.pop();
-
-  try {
-    return JSON.parse(s);
-  } catch {
-    return null;
-  }
-}
+import { parseModelJSON } from "./_json.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -107,7 +21,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 4096,
-        system: `You are a sharp, direct sales coach reviewing a freelance web designer's restaurant outreach pipeline. 
+        system: `You are a sharp, direct sales coach reviewing a freelance web designer's restaurant outreach pipeline.
 The designer charges $500 per website and targets independent restaurants via cold calls, walk-ins, cold emails, and Yelp messages.
 Analyze the pipeline data and return a JSON object with exactly this structure:
 {
@@ -141,26 +55,9 @@ Return only valid JSON, no markdown, no preamble.`,
     const text = data.content?.[0]?.text ?? "";
     const stopReason = data.stop_reason;
 
-    let parsed;
-
-    // 1. Straight parse
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      // 2. Extract a JSON blob if the model wrapped it in prose/markdown
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          parsed = JSON.parse(match[0]);
-        } catch {
-          // 3. Repair truncated JSON
-          parsed = repairTruncatedJSON(text);
-        }
-      } else {
-        // 3. Repair truncated JSON (no closing brace at all)
-        parsed = repairTruncatedJSON(text);
-      }
-    }
+    // Straight parse → extract a JSON blob → repair truncation. Shared with
+    // pitch.js so the two endpoints can't drift.
+    const parsed = parseModelJSON(text);
 
     if (!parsed) {
       return res.status(500).json({

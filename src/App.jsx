@@ -4,6 +4,7 @@ import {
   Route,
   Link,
   NavLink,
+  Navigate,
   useLocation,
   useNavigate,
   useSearchParams,
@@ -13,9 +14,9 @@ import SummaryBar from "./components/SummaryBar";
 import EmptyState from "./components/EmptyState";
 import LeadTable from "./components/LeadTable";
 import LeadModal from "./components/LeadModal";
+import NowBar from "./components/NowBar";
 import Settings from "./pages/Settings";
 import Search from "./pages/Search";
-import Checklist from "./pages/Checklist";
 import Reference from "./pages/Reference";
 import AI from "./pages/AI";
 import LeadDetail from "./pages/LeadDetail";
@@ -23,11 +24,13 @@ import Import from "./pages/Import";
 import Map from "./pages/MapPage";
 import LeadSpree from "./pages/LeadSpree";
 import { useNotifications, requestPermission } from "./hooks/useNotifications";
+import useTabStacks from "./hooks/useTabStacks";
 import Progress from "./pages/Progress";
 import CallPrep from "./pages/CallPrep";
-import DailyPlan from "./pages/DailyPlan";
+import Today from "./pages/Today";
 import PitchMode from "./pages/PitchMode";
 import Calendar from "./pages/Calendar";
+import RunOverview from "./pages/RunOverview";
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 
@@ -61,23 +64,6 @@ const DashboardIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"
-    />
-  </svg>
-);
-
-const ChecklistIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="w-5 h-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={1.8}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
     />
   </svg>
 );
@@ -172,23 +158,6 @@ const MapIcon = () => (
   </svg>
 );
 
-const HomeIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="w-5 h-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={1.8}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
-    />
-  </svg>
-);
-
 const PlanIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -223,11 +192,35 @@ const CalendarIcon = () => (
   </svg>
 );
 
-function BottomNavItem({ path, icon, label, currentPath, navigate }) {
-  const active = currentPath === path;
+const RunIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 0 1 0 1.971l-11.54 6.347a1.125 1.125 0 0 1-1.667-.985V5.653Z"
+    />
+  </svg>
+);
+
+function NavDivider() {
+  return <div className="h-px bg-slate-800 my-2 mx-2" />;
+}
+
+// The lit tab follows the *stack*, not the URL — standing on a lead inside the
+// Today stack lights Today. Without that there's no signal that tapping the tab
+// again does anything, and the pop-to-root gesture stays invisible.
+function BottomNavItem({ path, icon, label, activeTab, tabTo }) {
+  const active = activeTab === path;
   return (
     <button
-      onClick={() => navigate(path)}
+      onClick={() => tabTo(path)}
       className={`flex-1 flex flex-col items-center justify-center gap-1 py-4 transition-colors ${
         active ? "text-blue-400" : "text-slate-500 hover:text-slate-300"
       }`}
@@ -338,6 +331,7 @@ function Sidebar({ open, onClose }) {
   const panelRef = useRef(null);
   const leads = useCRMStore((s) => s.leads) ?? [];
   const refSections = useCRMStore((s) => s.refSections) ?? [];
+  const activeRun = useCRMStore((s) => s.activeRun);
 
   const today = new Date().toISOString().slice(0, 10);
   const dueToday = leads.filter(
@@ -347,6 +341,10 @@ function Sidebar({ open, onClose }) {
       l.followUpDate <= today &&
       l.lastTouchDate !== today,
   ).length;
+
+  const runRemaining = activeRun
+    ? activeRun.queue.length - Object.keys(activeRun.done || {}).length
+    : 0;
 
   const path = location.pathname;
   const go = (to) => {
@@ -436,45 +434,49 @@ function Sidebar({ open, onClose }) {
 
         {/* Nav items */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {/* Dashboard — desktop only (mobile has bottom nav) */}
-          <div className="hidden sm:block">
+          {/* ── What you're doing right now ──────────────────────────────── */}
+          {activeRun && (
             <SidebarNavItem
-              label="Dashboard"
+              label="Current Run"
+              icon={<RunIcon />}
+              active={path === "/run"}
+              onClick={() => go("/run")}
+              badge={runRemaining}
+            />
+          )}
+
+          {/* Today and Leads are bottom-nav tabs on mobile, so they only
+              appear here on desktop — along with the divider that separates
+              them, otherwise mobile gets a stray rule. */}
+          <div className="hidden sm:block space-y-1">
+            <SidebarNavItem
+              label="Today"
+              icon={<PlanIcon />}
+              active={path === "/today"}
+              onClick={() => go("/today")}
+              badge={dueToday}
+            />
+            <SidebarNavItem
+              label="Leads"
               icon={<DashboardIcon />}
               active={path === "/"}
               onClick={() => go("/")}
             />
+            <NavDivider />
           </div>
+
+          {/* ── Sources: places that suggest who to contact ──────────────── */}
           <SidebarNavItem
-            label="Progress"
-            icon={<ProgressIcon />}
-            active={path === "/progress"}
-            onClick={() => go("/progress")}
-          />
-          <SidebarNavItem
-            label="Checklist"
-            icon={<ChecklistIcon />}
-            active={path === "/checklist"}
-            onClick={() => go("/checklist")}
-            badge={dueToday}
-            subItems={[
-              {
-                label: "Due today",
-                onClick: () => go("/checklist?filter=due"),
-              },
-              {
-                label: "All active",
-                onClick: () => go("/checklist?filter=all"),
-              },
-            ]}
+            label="Calendar"
+            icon={<CalendarIcon />}
+            active={path === "/calendar"}
+            onClick={() => go("/calendar")}
           />
           <SidebarNavItem
             label="Territory Map"
             icon={<MapIcon />}
-            active={location.pathname === "/map"}
-            onClick={() => {
-              go("/map");
-            }}
+            active={path === "/map"}
+            onClick={() => go("/map")}
           />
           <SidebarNavItem
             label="Pipeline Advisor"
@@ -484,6 +486,16 @@ function Sidebar({ open, onClose }) {
             subItems={[
               { label: "Analyze now", onClick: () => go("/ai?action=analyze") },
             ]}
+          />
+
+          <NavDivider />
+
+          {/* ── Reference material and review ────────────────────────────── */}
+          <SidebarNavItem
+            label="Progress"
+            icon={<ProgressIcon />}
+            active={path === "/progress"}
+            onClick={() => go("/progress")}
           />
           <SidebarNavItem
             label="Reference"
@@ -501,51 +513,32 @@ function Sidebar({ open, onClose }) {
               })),
             ]}
           />
-          <SidebarNavItem
-            label="Daily Plan"
-            icon={<PlanIcon />}
-            active={path === "/plan"}
-            onClick={() => go("/plan")}
-          />
-          <SidebarNavItem
-            label="Calendar"
-            icon={<CalendarIcon />}
-            active={path === "/calendar"}
-            onClick={() => go("/calendar")}
-          />
-          {/* Search — desktop only (mobile has bottom nav) */}
-          <div className="hidden sm:block">
-            <SidebarNavItem
-              label="Search"
-              icon={<SearchIcon />}
-              active={path === "/search"}
-              onClick={() => go("/search")}
-            />
-          </div>
+
+          {/* Search is a header control on desktop and a bottom-nav tab on
+              mobile, so it is deliberately not in this list. */}
         </nav>
 
-        {/* Settings pinned to bottom */}
+        {/* Settings pinned to bottom — now on mobile too, since it gave up its
+            bottom-nav tab to Today. */}
         <div className="px-3 pb-8 border-t border-slate-800 pt-3">
-          <div className="hidden sm:block">
-            <SidebarNavItem
-              label="Settings"
-              icon={<SettingsIcon />}
-              active={path === "/settings"}
-              onClick={() => go("/settings")}
-              subItems={[
-                {
-                  label: "New group",
-                  onClick: () => go("/settings?action=new-group"),
-                },
-                {
-                  label: "New column",
-                  onClick: () => go("/settings?action=new-column"),
-                },
-              ]}
-            />
-          </div>
-          {/* Keyboard shortcuts hint */}
-          <div className="mt-3 mb-2 px-2 py-3 rounded-lg bg-slate-900/40 border border-slate-800">
+          <SidebarNavItem
+            label="Settings"
+            icon={<SettingsIcon />}
+            active={path === "/settings"}
+            onClick={() => go("/settings")}
+            subItems={[
+              {
+                label: "New group",
+                onClick: () => go("/settings?action=new-group"),
+              },
+              {
+                label: "New column",
+                onClick: () => go("/settings?action=new-column"),
+              },
+            ]}
+          />
+          {/* Keyboard shortcuts hint — desktop only */}
+          <div className="hidden sm:block mt-3 mb-2 px-2 py-3 rounded-lg bg-slate-900/40 border border-slate-800">
             <p className="text-xs text-slate-600 uppercase tracking-widest mb-2">
               Shortcuts
             </p>
@@ -553,7 +546,7 @@ function Sidebar({ open, onClose }) {
               {[
                 ["N", "New lead"],
                 ["/", "Search"],
-                ["C", "Checklist"],
+                ["T", "Today"],
                 ["M", "Map"],
                 ["R", "Reference"],
                 ["P", "Progress"],
@@ -843,6 +836,20 @@ export default function App() {
 
   useNotifications();
 
+  // Per-tab navigation. Records every location change, so nothing else in the
+  // app has to know about it.
+  const { activeTab, tabTo } = useTabStacks();
+
+  // ── Daily Plan rollover ───────────────────────────────────────────────────────
+  // Runs once per app load, from whichever page opens first. Previously this
+  // lived only in DailyPlan, which meant the rollover depended on visiting that
+  // page — and `lastPlanDate` could never leave null anyway, so it never fired.
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { lastPlanDate, clearDailyPlan } = useCRMStore.getState();
+    if (lastPlanDate && lastPlanDate < today) clearDailyPlan(today);
+  }, []);
+
   const handleEdit = (lead) => {
     setEditingLead(lead);
     setShowModal(true);
@@ -873,10 +880,14 @@ export default function App() {
           e.preventDefault();
           navigate("/search");
           break;
+        // C kept as an alias so the old Checklist reflex still lands somewhere
+        // sensible; T is the one advertised in the hint.
         case "c":
         case "C":
+        case "t":
+        case "T":
           e.preventDefault();
-          navigate("/checklist");
+          navigate("/today");
           break;
         case "m":
         case "M":
@@ -939,8 +950,23 @@ export default function App() {
             </span>
           </NavLink>
 
-          {/* Right — Add Lead (desktop only) */}
+          {/* Right — Search + Add Lead (desktop only; mobile has bottom nav) */}
           <div className="flex-1 flex items-center justify-end gap-3">
+            <button
+              onClick={() => navigate("/search")}
+              className={`hidden sm:flex items-center gap-2 border rounded-lg px-3 py-2.5 transition-colors ${
+                location.pathname === "/search"
+                  ? "border-blue-700 bg-blue-950/40 text-blue-300"
+                  : "border-slate-800 text-slate-500 hover:text-slate-200 hover:border-slate-600"
+              }`}
+              title="Search leads (/)"
+            >
+              <SearchIcon />
+              <span className="text-sm font-medium">Search</span>
+              <kbd className="text-xs bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-mono">
+                /
+              </kbd>
+            </button>
             {isDashboard && (
               <button
                 onClick={() => {
@@ -954,13 +980,21 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* The thread — lives inside the sticky header so it never collides with
+            the bottom nav, the FAB, or table pagination clearance. */}
+        <NowBar />
       </header>
 
       <Routes>
         <Route path="/" element={<Dashboard onEditLead={handleEdit} />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/search" element={<Search />} />
-        <Route path="/checklist" element={<Checklist />} />
+        <Route path="/today" element={<Today />} />
+        {/* Checklist and Daily Plan merged into Today. Redirects kept
+            indefinitely — muscle memory, bookmarks, the PWA home screen. */}
+        <Route path="/checklist" element={<Navigate to="/today" replace />} />
+        <Route path="/plan" element={<Navigate to="/today" replace />} />
         <Route path="/reference" element={<Reference />} />
         <Route path="/ai" element={<AI />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
@@ -968,9 +1002,9 @@ export default function App() {
         <Route path="/progress" element={<Progress />} />
         <Route path="/map" element={<Map />} />
         <Route path="/call/:id" element={<CallPrep />} />
-        <Route path="/plan" element={<DailyPlan />} />
         <Route path="/pitch/:id" element={<PitchMode />} />
         <Route path="/calendar" element={<Calendar />} />
+        <Route path="/run" element={<RunOverview />} />
       </Routes>
 
       {/* Mobile bottom spacer — pushes content above fixed nav */}
@@ -1014,26 +1048,28 @@ export default function App() {
       {/* Bottom nav — mobile only */}
       <nav className="pb-4 sm:hidden fixed bottom-0 inset-x-0 z-30 bg-[#03060f]/95 backdrop-blur-sm border-t border-slate-800 flex flex-col">
         <div className="flex items-center">
+          {/* Today replaces Home, and Settings gives up its tab — it's a
+              once-a-month page that was holding a third of your thumb reach. */}
+          <BottomNavItem
+            path="/today"
+            icon={<PlanIcon />}
+            label="Today"
+            activeTab={activeTab}
+            tabTo={tabTo}
+          />
           <BottomNavItem
             path="/"
-            icon={<HomeIcon />}
-            label="Home"
-            currentPath={location.pathname}
-            navigate={navigate}
+            icon={<DashboardIcon />}
+            label="Leads"
+            activeTab={activeTab}
+            tabTo={tabTo}
           />
           <BottomNavItem
             path="/search"
             icon={<SearchIcon />}
             label="Search"
-            currentPath={location.pathname}
-            navigate={navigate}
-          />
-          <BottomNavItem
-            path="/settings"
-            icon={<SettingsIcon />}
-            label="Settings"
-            currentPath={location.pathname}
-            navigate={navigate}
+            activeTab={activeTab}
+            tabTo={tabTo}
           />
         </div>
         <div

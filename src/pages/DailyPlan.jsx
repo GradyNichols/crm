@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
-import { STATUS_COLORS, OUTREACH_TYPES } from "../constants";
+import {
+  STATUS_COLORS,
+  OUTREACH_TYPES,
+  RUN_MODES,
+  RUN_MODE_LABELS,
+  stopPathFor,
+} from "../constants";
 
 // ── Summary modal shown on first open if yesterday had checked leads ─────────────
 function SummaryModal({ summary, leads, onDismiss }) {
@@ -77,6 +83,45 @@ function SummaryModal({ summary, leads, onDismiss }) {
   );
 }
 
+// ── Start Run sheet ──────────────────────────────────────────────────────────────
+// Picking a mode is the only decision — it determines which HUD each stop opens
+// in. Mixed follows each lead's own outreach type.
+function StartRunSheet({ count, onStart, onCancel }) {
+  return (
+    <div className="rounded-xl border border-blue-900/50 bg-blue-950/20 px-5 py-5 space-y-4">
+      <div>
+        <p className="text-xs font-semibold text-blue-400 uppercase tracking-widest">
+          Start a run
+        </p>
+        <p className="text-slate-400 text-sm mt-1">
+          {count} stop{count !== 1 ? "s" : ""}, in the order below. How are you
+          working them?
+        </p>
+      </div>
+      <div className="space-y-2">
+        {RUN_MODES.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => onStart(m.key)}
+            className="w-full text-left rounded-xl border border-slate-700 hover:border-blue-600 bg-slate-900/40 px-4 py-3 transition-colors group"
+          >
+            <p className="text-slate-100 text-sm font-semibold group-hover:text-blue-300 transition-colors">
+              {m.label}
+            </p>
+            <p className="text-slate-600 text-xs mt-0.5">{m.hint}</p>
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={onCancel}
+        className="w-full text-sm text-slate-500 hover:text-slate-300 py-2 transition-colors"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 // ── Log form shown after checking off a lead ─────────────────────────────────────
 function LogForm({ lead, onLog, onSkip, onCancel }) {
   const [note, setNote] = useState("");
@@ -139,7 +184,7 @@ function LogForm({ lead, onLog, onSkip, onCancel }) {
             onClick={() => onLog({ type, note })}
             className="text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg transition-colors"
           >
-            Log & Done
+            Log &amp; Done
           </button>
         </div>
       </div>
@@ -231,6 +276,7 @@ export default function DailyPlan() {
   const dailyPlan = useCRMStore((s) => s.dailyPlan) ?? [];
   const lastPlanDate = useCRMStore((s) => s.lastPlanDate);
   const lastPlanSummary = useCRMStore((s) => s.lastPlanSummary) ?? [];
+  const activeRun = useCRMStore((s) => s.activeRun);
   const {
     addToPlan,
     removeFromPlan,
@@ -241,14 +287,18 @@ export default function DailyPlan() {
     dismissPlanSummary,
   } = useCRMStore.getState();
   const logTouchpoint = useCRMStore.getState().logTouchpoint;
+  const startRun = useCRMStore.getState().startRun;
 
   const [showPicker, setShowPicker] = useState(false);
   const [logTarget, setLogTarget] = useState(null); // lead to log after check-off
   const [showSummary, setShowSummary] = useState(false);
+  const [choosingMode, setChoosingMode] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // On mount — check if plan needs resetting and if summary should show
+  // On mount — check if plan needs resetting and if summary should show.
+  // App.jsx also runs the rollover on load; this is the safety net for a session
+  // that was left open across midnight and then navigated here.
   useEffect(() => {
     if (lastPlanDate && lastPlanDate < today) {
       clearDailyPlan(today);
@@ -283,6 +333,16 @@ export default function DailyPlan() {
     }
     checkOffPlan(logTarget.item.leadId);
     setLogTarget(null);
+  };
+
+  // Turns today's remaining plan into a run and drops straight into stop one.
+  const handleStartRun = (mode) => {
+    const queue = pending.map((i) => i.leadId);
+    const run = startRun({ mode, origin: "plan", queue });
+    setChoosingMode(false);
+    if (!run) return;
+    const first = leads.find((l) => l.id === run.queue[0]);
+    navigate(stopPathFor(mode, first));
   };
 
   return (
@@ -325,6 +385,42 @@ export default function DailyPlan() {
           + Add Lead
         </button>
       </div>
+
+      {/* Run controls */}
+      {activeRun ? (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-900/50 bg-blue-950/20 px-4 py-3">
+          <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+          <p className="text-slate-300 text-sm flex-1 min-w-0 truncate">
+            {RUN_MODE_LABELS[activeRun.mode] || "Run"} in progress —{" "}
+            <span className="text-slate-500">
+              {Object.keys(activeRun.done || {}).length} of{" "}
+              {activeRun.queue.length} logged
+            </span>
+          </p>
+          <button
+            onClick={() => navigate("/run")}
+            className="shrink-0 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            Open run →
+          </button>
+        </div>
+      ) : choosingMode ? (
+        <StartRunSheet
+          count={pending.length}
+          onStart={handleStartRun}
+          onCancel={() => setChoosingMode(false)}
+        />
+      ) : (
+        pending.length > 0 && (
+          <button
+            onClick={() => setChoosingMode(true)}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-base font-semibold py-3 rounded-xl transition-colors"
+          >
+            Start run · {pending.length} stop
+            {pending.length !== 1 ? "s" : ""}
+          </button>
+        )
+      )}
 
       {/* Empty state */}
       {dailyPlan.length === 0 && (

@@ -1,7 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
-import { STATUS_COLORS } from "../constants";
+import { STATUS_COLORS, stopPathFor } from "../constants";
+import FinishStopModal, {
+  INTEREST_OPTIONS,
+} from "../components/FinishStopModal";
+import GeneratedPitch from "../components/GeneratedPitch";
+import useGeneratePitch from "../hooks/useGeneratePitch";
 
 const SPEED_STYLES = {
   bad: { bg: "bg-red-600", ring: "ring-red-400", label: "SLOW SITE" },
@@ -115,161 +120,6 @@ function PitchScripts({ scripts }) {
   );
 }
 
-// ── Finish Pitch modal ───────────────────────────────────────────────────────────
-const FOLLOWUP_DAYS = { Yes: 3, Maybe: 5, No: null };
-const INTEREST_OPTIONS = [
-  { key: "Yes", label: "Yes", status: "Warm", color: "green" },
-  { key: "Maybe", label: "Maybe", status: "Waiting", color: "amber" },
-  { key: "No", label: "No", status: "Dead", color: "red" },
-];
-
-function suggestFollowUp(key) {
-  const days = FOLLOWUP_DAYS[key];
-  if (!days) return "";
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function FinishPitchModal({ lead, onSave, onCancel }) {
-  const [interested, setInterested] = useState(null);
-  const [followUpDate, setFollowUpDate] = useState("");
-  const [notes, setNotes] = useState("");
-  const [nextAction, setNextAction] = useState("");
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }, []);
-
-  const handleInterest = (key) => {
-    setInterested(key);
-    setFollowUpDate(suggestFollowUp(key));
-  };
-
-  const handleSave = () => {
-    if (!interested) return;
-    onSave({ interested, followUpDate, notes, nextAction });
-  };
-
-  const selected = INTEREST_OPTIONS.find((o) => o.key === interested);
-
-  return (
-    <div className="fixed my-auto bottom-24 sm:bottom-0 top-0 mt-14 sm:pt-0 inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full sm:max-w-md bg-[#0d1117] border border-slate-700 sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] overflow-y-auto">
-        <div className="px-6 py-5 space-y-5">
-          <div>
-            <h3 className="text-slate-100 font-semibold text-lg">
-              Finish Pitch
-            </h3>
-            <p className="text-slate-500 text-sm mt-0.5">{lead.businessName}</p>
-          </div>
-
-          {/* Interested? */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-              Interested?
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {INTEREST_OPTIONS.map((opt) => {
-                const active = interested === opt.key;
-                const colorClasses = {
-                  green: active
-                    ? "border-green-500 bg-green-950/40 text-green-300"
-                    : "border-slate-700 text-slate-400 hover:border-green-700",
-                  amber: active
-                    ? "border-amber-500 bg-amber-950/40 text-amber-300"
-                    : "border-slate-700 text-slate-400 hover:border-amber-700",
-                  red: active
-                    ? "border-red-500 bg-red-950/40 text-red-300"
-                    : "border-slate-700 text-slate-400 hover:border-red-700",
-                };
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => handleInterest(opt.key)}
-                    className={`py-3 rounded-xl border text-sm font-semibold transition-colors ${colorClasses[opt.color]}`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Follow-up date */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Follow-up date
-            </label>
-            <input
-              type="date"
-              value={followUpDate}
-              onChange={(e) => setFollowUpDate(e.target.value)}
-              style={{ width: "100%", minWidth: 0 }}
-              className="block w-full min-w-0 bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-colors appearance-none"
-            />
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Notes
-            </label>
-            <textarea
-              ref={inputRef}
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="What happened during the pitch?"
-              className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors resize-none"
-            />
-          </div>
-
-          {/* Next action */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Next action
-            </label>
-            <input
-              type="text"
-              value={nextAction}
-              onChange={(e) => setNextAction(e.target.value)}
-              placeholder="e.g. Send proposal Friday"
-              className="w-full bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2.5 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 justify-end pt-1">
-            <button
-              onClick={onCancel}
-              className="text-sm text-slate-400 hover:text-slate-200 px-4 py-2.5 rounded-lg hover:bg-slate-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!interested}
-              className={`text-sm font-semibold px-5 py-2.5 rounded-lg text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                selected?.color === "green"
-                  ? "bg-green-700 hover:bg-green-600"
-                  : selected?.color === "amber"
-                    ? "bg-amber-700 hover:bg-amber-600"
-                    : selected?.color === "red"
-                      ? "bg-red-700 hover:bg-red-600"
-                      : "bg-blue-600 hover:bg-blue-500"
-              }`}
-            >
-              Save & Continue
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main page ────────────────────────────────────────────────────────────────────
 export default function PitchMode() {
   const { id } = useParams();
@@ -281,11 +131,19 @@ export default function PitchMode() {
   const portfolioUrl = useCRMStore((s) => s.portfolioUrl) ?? "";
   const pageSpeedCache = useCRMStore((s) => s.pageSpeedCache) ?? {};
   const dailyPlan = useCRMStore((s) => s.dailyPlan) ?? [];
+  const activeRun = useCRMStore((s) => s.activeRun);
 
   const updateLead = useCRMStore.getState().updateLead;
   const logTouchpoint = useCRMStore.getState().logTouchpoint;
   const checkOffPlan = useCRMStore.getState().checkOffPlan;
   const setPageSpeed = useCRMStore.getState().setPageSpeed;
+  const completeRunStop = useCRMStore.getState().completeRunStop;
+  const skipRunStop = useCRMStore.getState().skipRunStop;
+  const {
+    generate: generatePitch,
+    pendingId: pitchPending,
+    error: pitchError,
+  } = useGeneratePitch();
 
   const lead = leads.find((l) => l.id === id);
 
@@ -307,6 +165,12 @@ export default function PitchMode() {
       </div>
     );
   }
+
+  // ── Run context ───────────────────────────────────────────────────────────────
+  // Only true when this lead is a stop in the run that's actually in progress.
+  const runIndex = activeRun ? activeRun.queue.indexOf(lead.id) : -1;
+  const inRun = runIndex !== -1;
+  const runTotal = activeRun ? activeRun.queue.length : 0;
 
   const pitchScripts = refSections
     .flatMap((sec) => sec.cards)
@@ -343,9 +207,35 @@ export default function PitchMode() {
     return pending.length > 0 ? pending[0].leadId : null;
   };
 
+  // Where to go once this stop is closed out. Inside a run the store owns the
+  // cursor, so we read it back after the write rather than guessing here.
+  const goToNextStop = () => {
+    const {
+      activeRun: runAfter,
+      lastRun,
+      leads: freshLeads,
+    } = useCRMStore.getState();
+    if (runAfter) {
+      const nextLead = freshLeads.find(
+        (l) => l.id === runAfter.queue[runAfter.cursor],
+      );
+      navigate(stopPathFor(runAfter.mode, nextLead));
+      return;
+    }
+    if (lastRun) {
+      navigate("/run");
+      return;
+    }
+    navigate("/today");
+  };
+
+  const handleSkipStop = () => {
+    skipRunStop(lead.id);
+    goToNextStop();
+  };
+
   const handleFinish = ({ interested, followUpDate, notes, nextAction }) => {
     const opt = INTEREST_OPTIONS.find((o) => o.key === interested);
-    const nextId = getNextPendingLeadId();
 
     // Update status + follow-up
     updateLead(lead.id, {
@@ -366,25 +256,39 @@ export default function PitchMode() {
       logTouchpoint(lead.id, { type: "Walk-in", note: "" });
     }
 
-    // Check off in today's plan if it was part of it
+    setShowFinish(false);
+
+    if (inRun) {
+      // Records the outcome, mirrors it into today's plan, advances the cursor.
+      completeRunStop(lead.id, interested);
+      goToNextStop();
+      return;
+    }
+
+    // ── No run: the original Daily Plan auto-advance, unchanged ────────────────
+    const nextId = getNextPendingLeadId();
     if (dailyPlan.some((i) => i.leadId === lead.id)) {
       checkOffPlan(lead.id);
     }
-
-    setShowFinish(false);
-
     if (nextId) navigate(`/pitch/${nextId}`);
-    else navigate("/plan");
+    else navigate("/today");
   };
 
   return (
     <div className="px-4 sm:px-6 pb-24 sm:pb-4 pt-24 mx-auto fixed left-0 right-0 max-w-3xl inset-0 bg-[#03060f] flex flex-col overflow-hidden">
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-5 scrollbar-none">
+      {/* min-h-0 so this actually becomes a bounded scroll box rather than
+          growing past the fixed parent and getting clipped — same failure mode
+          that was cutting off Call Prep. */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 space-y-5 scrollbar-none">
         {/* Header */}
         <div className="flex items-center justify-between px-0 pt-6 pb-4 shrink-0">
           <button
-            onClick={() => navigate(`/lead/${id}`, { state: location.state })}
+            onClick={() =>
+              inRun
+                ? navigate("/run")
+                : navigate(`/lead/${id}`, { state: location.state })
+            }
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
           >
             <svg
@@ -404,6 +308,12 @@ export default function PitchMode() {
           </button>
           <span className="text-xs text-purple-400 uppercase tracking-widest font-medium">
             Pitch Mode
+            {inRun && (
+              <span className="text-slate-600 normal-case tracking-normal">
+                {" "}
+                · stop {runIndex + 1} of {runTotal}
+              </span>
+            )}
           </span>
           <div className="w-9" />
         </div>
@@ -547,28 +457,76 @@ export default function PitchMode() {
           </div>
         )}
 
-        {/* Pitch script */}
+        {/* This lead's own pitch, written from its history. Sits above the
+            Reference cards because it's specific and they're general. */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+              This Lead's Pitch
+            </p>
+            {!pitchPending && (
+              <button
+                onClick={() => generatePitch(lead)}
+                className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                {lead.generatedPitch ? "Rewrite" : "Write one"}
+              </button>
+            )}
+          </div>
+
+          {pitchError && <p className="text-xs text-red-400">{pitchError}</p>}
+
+          {pitchPending === lead.id ? (
+            <div className="rounded-xl border border-slate-800 bg-slate-900/20 px-5 py-6 text-center">
+              <p className="text-slate-500 text-sm animate-pulse">
+                Writing a pitch from this lead's history…
+              </p>
+            </div>
+          ) : lead.generatedPitch ? (
+            <GeneratedPitch lead={lead} compact />
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/20 px-5 py-5 text-center space-y-1">
+              <p className="text-slate-500 text-sm">
+                No pitch written for {lead.businessName} yet.
+              </p>
+              <p className="text-slate-700 text-xs">
+                Takes a few seconds — worth doing before you get out of the car.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Stable hand-written material */}
         <div className="space-y-2">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-            Pitch Script
+            Reference Scripts
           </p>
           <PitchScripts scripts={pitchScripts} />
         </div>
       </div>
 
       {/* Finish Pitch CTA */}
-      <div className="px-6 pb-6 pt-3 border-t border-slate-800 shrink-0">
+      <div className="px-6 pb-6 pt-3 border-t border-slate-800 shrink-0 space-y-2">
         <button
           onClick={() => setShowFinish(true)}
           className="w-full bg-purple-600 hover:bg-purple-500 text-white text-base font-semibold py-3.5 rounded-xl transition-colors"
         >
           Finish Pitch
         </button>
+        {inRun && runTotal > 1 && (
+          <button
+            onClick={handleSkipStop}
+            className="w-full text-sm text-slate-500 hover:text-slate-300 py-1.5 transition-colors"
+          >
+            Nobody home — skip to next stop
+          </button>
+        )}
       </div>
 
       {showFinish && (
-        <FinishPitchModal
+        <FinishStopModal
           lead={lead}
+          kind="pitch"
           onSave={handleFinish}
           onCancel={() => setShowFinish(false)}
         />

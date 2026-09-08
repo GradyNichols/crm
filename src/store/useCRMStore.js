@@ -19,6 +19,26 @@ const migrateNotes = (lead) => {
 const id = (prefix = "id") =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+// ── Run helpers ────────────────────────────────────────────────────────────────
+// The next stop that is neither completed nor skipped, searching forward from
+// `from` and then wrapping to the front so skipped stops come back around at the
+// end of the pass. Returns -1 when nothing is left to work.
+const nextOpenIndex = (run, from) => {
+  const n = run.queue.length;
+  const open = (i) => !run.done[run.queue[i]] && !run.skipped[run.queue[i]];
+  for (let i = Math.max(0, from); i < n; i++) if (open(i)) return i;
+  for (let i = 0; i < Math.min(Math.max(0, from), n); i++)
+    if (open(i)) return i;
+  return -1;
+};
+
+const finishRun = (run) => ({
+  activeRun: null,
+  lastRun: { ...run, endedAt: new Date().toISOString() },
+});
+
 const useCRMStore = create(
   persist(
     (set) => ({
@@ -82,6 +102,29 @@ const useCRMStore = create(
         }));
       },
 
+      // ── Generated pitches ───────────────────────────────────────────────────
+      // Stored on the lead, not in Reference: Reference holds stable
+      // hand-written material, and a generated pitch has a completely different
+      // lifecycle — it goes stale the moment the lead's story moves on.
+      // `generatedPitch` is an optional key; leads without one are untouched.
+      setLeadPitch: (leadId, pitch) => {
+        set((s) => ({
+          leads: s.leads.map((l) =>
+            l.id === leadId ? { ...l, generatedPitch: pitch } : l,
+          ),
+        }));
+      },
+
+      clearLeadPitch: (leadId) => {
+        set((s) => ({
+          leads: s.leads.map((l) => {
+            if (l.id !== leadId) return l;
+            const { generatedPitch, ...rest } = l;
+            return rest;
+          }),
+        }));
+      },
+
       deleteNoteEntry: (leadId, noteId) => {
         set((s) => ({
           leads: s.leads.map((l) =>
@@ -96,7 +139,27 @@ const useCRMStore = create(
       },
 
       deleteLead: (leadId) => {
-        set((s) => ({ leads: s.leads.filter((l) => l.id !== leadId) }));
+        set((s) => {
+          const patch = { leads: s.leads.filter((l) => l.id !== leadId) };
+          // Keep an in-flight run from pointing at a lead that no longer exists
+          if (s.activeRun?.queue.includes(leadId)) {
+            const run = s.activeRun;
+            const idx = run.queue.indexOf(leadId);
+            const queue = run.queue.filter((x) => x !== leadId);
+            if (queue.length === 0) {
+              patch.activeRun = null;
+            } else {
+              const { [leadId]: _d, ...done } = run.done;
+              const { [leadId]: _s, ...skipped } = run.skipped;
+              const cursor = Math.min(
+                idx < run.cursor ? run.cursor - 1 : run.cursor,
+                queue.length - 1,
+              );
+              patch.activeRun = { ...run, queue, done, skipped, cursor };
+            }
+          }
+          return patch;
+        });
       },
 
       setSort: (key) => {
@@ -345,6 +408,9 @@ const useCRMStore = create(
           },
           pageSpeedCache: data.pageSpeedCache || {},
           portfolioUrl: data.portfolioUrl || "",
+          // A restored backup describes a pipeline, not a session in progress.
+          activeRun: null,
+          lastRun: null,
         });
       },
 
@@ -376,7 +442,10 @@ const useCRMStore = create(
 
       // ── Daily Plan ──────────────────────────────────────────────────────────────
       dailyPlan: [],
-      lastPlanDate: null,
+      // Seeded to today at store creation. Previously this started as null and the
+      // only writer (clearDailyPlan) was gated on it already being non-null, so the
+      // midnight rollover could never fire.
+      lastPlanDate: todayStr(),
       lastPlanSummary: [],
 
       addToPlan: (leadId) => {
@@ -438,6 +507,169 @@ const useCRMStore = create(
         set({ lastPlanSummary: [] });
       },
 
+      // ── Runs ────────────────────────────────────────────────────────────────
+      // activeRun is the one thing the app is doing right now. It survives
+      // navigation, a refresh, and a force-quit in the field.
+      //
+      // {
+      //   id, mode: "calls"|"walkins"|"mixed", origin: "plan"|"map"|"checklist"|"adhoc",
+      //   startedAt, queue: [leadId], cursor: 0,
+      //   done: { [leadId]: { at, outcome } },
+      //   skipped: { [leadId]: true },
+      // }
+      activeRun: null,
+      lastRun: null,
+
+      startRun: ({ mode = "mixed", origin = "adhoc", queue = [] }) => {
+        const clean = [...new Set(queue)].filter(Boolean);
+        if (clean.length === 0) return null;
+        const run = {
+          id: id("run"),
+          mode,
+          origin,
+          startedAt: new Date().toISOString(),
+          queue: clean,
+          cursor: 0,
+          done: {},
+          skipped: {},
+        };
+        set({ activeRun: run, lastRun: null });
+        return run;
+      },
+
+      endRun: () => {
+        set((s) => (s.activeRun ? finishRun(s.activeRun) : {}));
+      },
+
+      // Moves past the current stop without recording anything about it. The
+      // stop comes back around at the end of the pass.
+      skipRunStop: (leadId) => {
+        set((s) => {
+          if (!s.activeRun) return {};
+          const run = {
+            ...s.activeRun,
+            skipped: { ...s.activeRun.skipped, [leadId]: true },
+          };
+          const idx = run.queue.indexOf(leadId);
+          const next = nextOpenIndex(run, (idx === -1 ? run.cursor : idx) + 1);
+          if (next === -1) return finishRun(run);
+          return { activeRun: { ...run, cursor: next } };
+        });
+      },
+
+      // Records an outcome for a stop, mirrors the completion into today's plan
+      // if the lead is on it, and advances to the next open stop.
+      completeRunStop: (leadId, outcome = "logged") => {
+        set((s) => {
+          const patch = {};
+          if (s.dailyPlan.some((i) => i.leadId === leadId && !i.checkedAt)) {
+            patch.dailyPlan = s.dailyPlan.map((i) =>
+              i.leadId === leadId
+                ? { ...i, checkedAt: new Date().toISOString() }
+                : i,
+            );
+          }
+          if (!s.activeRun) return patch;
+          const { [leadId]: _skipped, ...skipped } = s.activeRun.skipped;
+          const run = {
+            ...s.activeRun,
+            skipped,
+            done: {
+              ...s.activeRun.done,
+              [leadId]: { at: new Date().toISOString(), outcome },
+            },
+          };
+          const idx = run.queue.indexOf(leadId);
+          const next = nextOpenIndex(run, (idx === -1 ? run.cursor : idx) + 1);
+          if (next === -1) return { ...patch, ...finishRun(run) };
+          return { ...patch, activeRun: { ...run, cursor: next } };
+        });
+      },
+
+      // Jumping to a stop clears its skip flag — you're working it now.
+      setRunCursor: (index) => {
+        set((s) => {
+          if (!s.activeRun) return {};
+          if (index < 0 || index >= s.activeRun.queue.length) return {};
+          const leadId = s.activeRun.queue[index];
+          const { [leadId]: _skipped, ...skipped } = s.activeRun.skipped;
+          return { activeRun: { ...s.activeRun, cursor: index, skipped } };
+        });
+      },
+
+      // next: true inserts directly after the current stop, otherwise appends.
+      addToRun: (leadId, { next = false } = {}) => {
+        set((s) => {
+          if (!s.activeRun || !leadId) return {};
+          const run = s.activeRun;
+          const { [leadId]: _skipped, ...skipped } = run.skipped;
+          const existing = run.queue.indexOf(leadId);
+
+          if (existing !== -1) {
+            // Already the stop you're standing on — nothing to reorder.
+            if (!next || existing === run.cursor)
+              return { activeRun: { ...run, skipped } };
+            const queue = run.queue.filter((x) => x !== leadId);
+            const at = Math.min(
+              queue.indexOf(run.queue[run.cursor]) + 1,
+              queue.length,
+            );
+            queue.splice(at, 0, leadId);
+            return {
+              activeRun: {
+                ...run,
+                queue,
+                skipped,
+                cursor: queue.indexOf(run.queue[run.cursor]),
+              },
+            };
+          }
+
+          const queue = [...run.queue];
+          if (next) queue.splice(run.cursor + 1, 0, leadId);
+          else queue.push(leadId);
+          return { activeRun: { ...run, queue, skipped } };
+        });
+      },
+
+      removeFromRun: (leadId) => {
+        set((s) => {
+          if (!s.activeRun) return {};
+          const run = s.activeRun;
+          const idx = run.queue.indexOf(leadId);
+          if (idx === -1) return {};
+          const queue = run.queue.filter((x) => x !== leadId);
+          if (queue.length === 0) return { activeRun: null };
+          const { [leadId]: _d, ...done } = run.done;
+          const { [leadId]: _s, ...skipped } = run.skipped;
+          const cursor = Math.min(
+            idx < run.cursor ? run.cursor - 1 : run.cursor,
+            queue.length - 1,
+          );
+          return { activeRun: { ...run, queue, done, skipped, cursor } };
+        });
+      },
+
+      moveRunStop: (leadId, dir) => {
+        set((s) => {
+          if (!s.activeRun) return {};
+          const run = s.activeRun;
+          const i = run.queue.indexOf(leadId);
+          const j = i + dir;
+          if (i === -1 || j < 0 || j >= run.queue.length) return {};
+          const queue = [...run.queue];
+          [queue[i], queue[j]] = [queue[j], queue[i]];
+          const currentId = run.queue[run.cursor];
+          return {
+            activeRun: { ...run, queue, cursor: queue.indexOf(currentId) },
+          };
+        });
+      },
+
+      dismissRunRecap: () => {
+        set({ lastRun: null });
+      },
+
       // ── Danger Zone ─────────────────────────────────────────────────────────
       resetAllData: () => {
         set({
@@ -455,12 +687,14 @@ const useCRMStore = create(
             stale: true,
           },
           dailyPlan: [],
-          lastPlanDate: null,
+          lastPlanDate: todayStr(),
           lastPlanSummary: [],
           homeBase: null,
           pageSpeedCache: {},
           portfolioUrl: "",
           pipelineAnalysis: null,
+          activeRun: null,
+          lastRun: null,
         });
       },
     }),
@@ -482,6 +716,8 @@ const useCRMStore = create(
         pageSpeedCache: s.pageSpeedCache,
         portfolioUrl: s.portfolioUrl,
         pipelineAnalysis: s.pipelineAnalysis,
+        activeRun: s.activeRun,
+        lastRun: s.lastRun,
       }),
       merge: (persisted, current) => ({
         ...current,
@@ -497,12 +733,24 @@ const useCRMStore = create(
           stale: true,
         },
         dailyPlan: persisted.dailyPlan || [],
-        lastPlanDate: persisted.lastPlanDate || null,
+        lastPlanDate: persisted.lastPlanDate || todayStr(),
         lastPlanSummary: persisted.lastPlanSummary || [],
         homeBase: persisted.homeBase || null,
         pageSpeedCache: persisted.pageSpeedCache || {},
         portfolioUrl: persisted.portfolioUrl || "",
         pipelineAnalysis: persisted.pipelineAnalysis || null,
+        // Runs written before `skipped` existed rehydrate with an empty map.
+        activeRun: persisted.activeRun
+          ? {
+              done: {},
+              skipped: {},
+              cursor: 0,
+              ...persisted.activeRun,
+            }
+          : null,
+        lastRun: persisted.lastRun
+          ? { done: {}, skipped: {}, ...persisted.lastRun }
+          : null,
       }),
     },
   ),

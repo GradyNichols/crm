@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
-import { STATUS_COLORS, OUTREACH_TYPES } from "../constants";
+import { STATUS_COLORS, OUTREACH_TYPES, stopPathFor } from "../constants";
 import EmptyState from "../components/EmptyState";
 
-const today = new Date().toISOString().slice(0, 10);
+// Computed per render, not once at module load — an installed PWA left open
+// overnight would otherwise keep grading "due today" against yesterday.
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
-function ChecklistItem({ lead, onLog }) {
+function ChecklistItem({ lead, today, onLog }) {
   const done = lead.lastTouchDate === today;
   const [expanded, setExpanded] = useState(false);
   const [type, setType] = useState(lead.type || "Phone Call");
@@ -118,10 +120,17 @@ export default function Checklist() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const leads = useCRMStore((s) => s.leads) ?? [];
-  const logTouchpoint = useCRMStore((s) => s.logTouchpoint);
+  const activeRun = useCRMStore((s) => s.activeRun);
+
+  // Actions off getState() — persist strips functions during hydration.
+  const logTouchpoint = useCRMStore.getState().logTouchpoint;
+  const startRun = useCRMStore.getState().startRun;
+
   const [filter, setFilter] = useState(() =>
     searchParams.get("filter") === "all" ? "all" : "due",
   );
+
+  const today = todayStr();
 
   useEffect(() => {
     const p = searchParams.get("filter");
@@ -147,6 +156,22 @@ export default function Checklist() {
       l.followUpDate &&
       l.followUpDate <= today,
   ).length;
+
+  // Only the ones still untouched today are worth queueing up.
+  const runnable = dueLeads.filter((l) => l.lastTouchDate !== today);
+
+  // A checklist run is mixed — each lead opens in the HUD its own outreach type
+  // implies, since this list is whatever happens to be due.
+  const handleRunThese = () => {
+    const run = startRun({
+      mode: "mixed",
+      origin: "checklist",
+      queue: runnable.map((l) => l.id),
+    });
+    if (!run) return;
+    const first = leads.find((l) => l.id === run.queue[0]);
+    navigate(stopPathFor("mixed", first));
+  };
 
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -204,6 +229,25 @@ export default function Checklist() {
         >
           All active
         </button>
+
+        {/* Turn this list into a run */}
+        {activeRun ? (
+          <button
+            onClick={() => navigate("/run")}
+            className="ml-auto text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            Open run →
+          </button>
+        ) : (
+          runnable.length > 0 && (
+            <button
+              onClick={handleRunThese}
+              className="ml-auto text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg transition-colors"
+            >
+              Run these {runnable.length}
+            </button>
+          )
+        )}
       </div>
 
       {dueLeads.length === 0 ? (
@@ -227,7 +271,12 @@ export default function Checklist() {
       ) : (
         <div className="space-y-2">
           {dueLeads.map((lead) => (
-            <ChecklistItem key={lead.id} lead={lead} onLog={logTouchpoint} />
+            <ChecklistItem
+              key={lead.id}
+              lead={lead}
+              today={today}
+              onLog={logTouchpoint}
+            />
           ))}
         </div>
       )}

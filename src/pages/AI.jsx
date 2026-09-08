@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
+import QueueButton, { QueueAllButton } from "../components/QueueButton";
+import useGeneratePitch from "../hooks/useGeneratePitch";
 
 function formatPipeline(leads) {
   if (!leads.length) return "No leads in pipeline.";
@@ -32,28 +34,81 @@ function formatPipeline(leads) {
     .join("\n\n");
 }
 
-// ── Section components ──────────────────────────────────────────────────────────
+// ── Name → lead ─────────────────────────────────────────────────────────────────
+// /api/analyze returns `lead` as a business-name string, not an id, so anything
+// that wants to act on a recommendation has to resolve it. Exact
+// case-insensitive match first, then a looser containment match for when the
+// model reformats the name slightly. Ambiguous matches resolve to nothing rather
+// than guessing at the wrong restaurant.
+function resolveLead(name, leads) {
+  if (!name) return null;
+  const needle = String(name).trim().toLowerCase();
+  if (!needle) return null;
 
-function UrgentCard({ item }) {
-  return (
-    <div className="flex gap-3 items-start px-4 py-3 rounded-lg bg-red-950/30 border border-red-900/40">
-      <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-2 shrink-0" />
-      <div>
-        <p className="text-slate-100 font-semibold text-sm">{item.lead}</p>
-        <p className="text-slate-400 text-sm mt-0.5">{item.reason}</p>
-      </div>
-    </div>
-  );
+  const exact = leads.filter((l) => l.businessName.toLowerCase() === needle);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return null;
+
+  const loose = leads.filter((l) => {
+    const hay = l.businessName.toLowerCase();
+    return hay.includes(needle) || needle.includes(hay);
+  });
+  return loose.length === 1 ? loose[0] : null;
 }
 
-function StaleCard({ item }) {
+// ── Section components ──────────────────────────────────────────────────────────
+
+function AdviceCard({ item, lead, tone, onOpen, onWritePitch, pitchPending }) {
+  const styles =
+    tone === "urgent"
+      ? { wrap: "bg-red-950/30 border-red-900/40", dot: "bg-red-400" }
+      : { wrap: "bg-amber-950/20 border-amber-900/30", dot: "bg-amber-500" };
+
+  const writing = pitchPending === lead?.id;
+
   return (
-    <div className="flex gap-3 items-start px-4 py-3 rounded-lg bg-amber-950/20 border border-amber-900/30">
-      <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
-      <div>
-        <p className="text-slate-100 font-semibold text-sm">{item.lead}</p>
+    <div
+      className={`flex gap-3 items-start px-4 py-3 rounded-lg border ${styles.wrap}`}
+    >
+      <div className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${styles.dot}`} />
+      <div className="flex-1 min-w-0">
+        {lead ? (
+          <button
+            onClick={() => onOpen(lead.id)}
+            className="text-slate-100 font-semibold text-sm hover:text-white transition-colors text-left"
+          >
+            {item.lead}
+          </button>
+        ) : (
+          <p className="text-slate-100 font-semibold text-sm">{item.lead}</p>
+        )}
         <p className="text-slate-400 text-sm mt-0.5">{item.reason}</p>
+        {!lead && (
+          <p className="text-slate-600 text-xs mt-1 italic">
+            No matching lead — rename mismatch?
+          </p>
+        )}
       </div>
+      {lead && (
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Acting on a recommendation usually means opening with something.
+              Write it here rather than making a round trip to the lead page. */}
+          <button
+            onClick={() =>
+              lead.generatedPitch ? onOpen(lead.id) : onWritePitch(lead)
+            }
+            disabled={!!pitchPending && !writing}
+            className="text-xs font-semibold text-purple-400 hover:text-purple-300 disabled:opacity-40 border border-purple-900/50 hover:border-purple-700 px-2.5 py-1.5 rounded-lg transition-colors"
+          >
+            {writing
+              ? "Writing…"
+              : lead.generatedPitch
+                ? "View pitch"
+                : "Pitch"}
+          </button>
+          <QueueButton leadId={lead.id} size="compact" />
+        </div>
+      )}
     </div>
   );
 }
@@ -91,8 +146,32 @@ export default function AI() {
   const clearPipelineAnalysis = useCRMStore.getState().clearPipelineAnalysis;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const {
+    generate: generatePitch,
+    pendingId: pitchPending,
+    error: pitchError,
+  } = useGeneratePitch();
 
   const result = pipelineAnalysis?.result ?? null;
+
+  // Resolve every recommendation to a real lead once, so the cards and the
+  // bulk button agree about what's actionable.
+  const urgent = useMemo(
+    () =>
+      (result?.urgent || []).map((item) => ({
+        item,
+        lead: resolveLead(item.lead, leads),
+      })),
+    [result, leads],
+  );
+  const stale = useMemo(
+    () =>
+      (result?.stale || []).map((item) => ({
+        item,
+        lead: resolveLead(item.lead, leads),
+      })),
+    [result, leads],
+  );
 
   // Human-readable "how long ago" label
   const analyzedAgo = (() => {
@@ -151,6 +230,7 @@ export default function AI() {
   }, [searchParams]);
 
   const isEmpty = leads.length === 0;
+  const openLead = (id) => navigate(`/lead/${id}`, { state: { from: "/ai" } });
 
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-8">
@@ -280,6 +360,15 @@ export default function AI() {
         </div>
       </div>
 
+      {pitchError && (
+        <div className="rounded-xl border border-red-900/50 bg-red-950/20 px-5 py-4">
+          <p className="text-red-400 text-sm font-medium">
+            Pitch generation failed
+          </p>
+          <p className="text-red-400/70 text-sm mt-1">{pitchError}</p>
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="rounded-xl border border-red-900/50 bg-red-950/20 px-5 py-4">
@@ -292,34 +381,60 @@ export default function AI() {
       {result && (
         <div className="space-y-6">
           {/* Urgent */}
-          {result.urgent?.length > 0 && (
+          {urgent.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-red-400" />
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
                   Urgent — Act Now
                 </h3>
+                <div className="ml-auto">
+                  <QueueAllButton
+                    leadIds={urgent.filter((u) => u.lead).map((u) => u.lead.id)}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                {result.urgent.map((item, i) => (
-                  <UrgentCard key={i} item={item} />
+                {urgent.map(({ item, lead }, i) => (
+                  <AdviceCard
+                    key={i}
+                    item={item}
+                    lead={lead}
+                    tone="urgent"
+                    onOpen={openLead}
+                    onWritePitch={generatePitch}
+                    pitchPending={pitchPending}
+                  />
                 ))}
               </div>
             </section>
           )}
 
           {/* Stale */}
-          {result.stale?.length > 0 && (
+          {stale.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-400" />
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
                   Going Stale
                 </h3>
+                <div className="ml-auto">
+                  <QueueAllButton
+                    leadIds={stale.filter((s) => s.lead).map((s) => s.lead.id)}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                {result.stale.map((item, i) => (
-                  <StaleCard key={i} item={item} />
+                {stale.map(({ item, lead }, i) => (
+                  <AdviceCard
+                    key={i}
+                    item={item}
+                    lead={lead}
+                    tone="stale"
+                    onOpen={openLead}
+                    onWritePitch={generatePitch}
+                    pitchPending={pitchPending}
+                  />
                 ))}
               </div>
             </section>

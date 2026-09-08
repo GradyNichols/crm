@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import EmptyState from "../components/EmptyState";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS } from "../constants";
+import QueueButton from "../components/QueueButton";
 
 export default function Search() {
   const navigate = useNavigate();
@@ -117,59 +118,70 @@ export default function Search() {
 
           {results.length > 0 && (
             <div className="rounded-xl border border-slate-800 overflow-hidden divide-y divide-slate-800">
-              {results.map((lead) => (
-                <Link
-                  key={lead.id}
-                  to={`/lead/${lead.id}`}
-                  state={{ from: "/search" }}
-                  className="block px-5 py-4 bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1 min-w-0">
-                      <p className="text-slate-100 font-semibold text-base">
-                        <Highlight text={lead.businessName} query={q} />
-                      </p>
-                      {lead.ownerName && (
-                        <p className="text-slate-400 text-sm">
-                          <Highlight text={lead.ownerName} query={q} />
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-slate-500">
-                        {lead.phone && (
-                          <span>
-                            <Highlight text={lead.phone} query={q} />
+              {results.map((lead) => {
+                return (
+                  <div
+                    key={lead.id}
+                    className="flex items-stretch bg-slate-900/20 hover:bg-slate-800/30 transition-colors"
+                  >
+                    <Link
+                      to={`/lead/${lead.id}`}
+                      state={{ from: "/search" }}
+                      className="block flex-1 min-w-0 px-5 py-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                          <p className="text-slate-100 font-semibold text-base">
+                            <Highlight text={lead.businessName} query={q} />
+                          </p>
+                          {lead.ownerName && (
+                            <p className="text-slate-400 text-sm">
+                              <Highlight text={lead.ownerName} query={q} />
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-slate-500">
+                            {lead.phone && (
+                              <span>
+                                <Highlight text={lead.phone} query={q} />
+                              </span>
+                            )}
+                            {lead.email && (
+                              <span>
+                                <Highlight text={lead.email} query={q} />
+                              </span>
+                            )}
+                            {lead.address && (
+                              <span>
+                                <Highlight text={lead.address} query={q} />
+                              </span>
+                            )}
+                          </div>
+                          {lead.notes && (
+                            <p className="text-slate-600 text-sm italic truncate">
+                              "<Highlight text={lead.notes} query={q} />"
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <span
+                            className={`text-sm px-2.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COLORS[lead.status] || ""}`}
+                          >
+                            {lead.status}
                           </span>
-                        )}
-                        {lead.email && (
-                          <span>
-                            <Highlight text={lead.email} query={q} />
+                          <span className="text-xs text-slate-600 whitespace-nowrap">
+                            {lead.type}
                           </span>
-                        )}
-                        {lead.address && (
-                          <span>
-                            <Highlight text={lead.address} query={q} />
-                          </span>
-                        )}
+                        </div>
                       </div>
-                      {lead.notes && (
-                        <p className="text-slate-600 text-sm italic truncate">
-                          "<Highlight text={lead.notes} query={q} />"
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <span
-                        className={`text-sm px-2.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COLORS[lead.status] || ""}`}
-                      >
-                        {lead.status}
-                      </span>
-                      <span className="text-xs text-slate-600 whitespace-nowrap">
-                        {lead.type}
-                      </span>
+                    </Link>
+
+                    {/* Queue whatever you just looked up, without leaving Search */}
+                    <div className="shrink-0 flex items-center pr-4 pl-3 border-l border-slate-800">
+                      <QueueButton leadId={lead.id} size="compact" />
                     </div>
                   </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
-import { STATUS_COLORS, STATUSES, OUTREACH_TYPES } from "../constants";
+import {
+  STATUS_COLORS,
+  OUTREACH_TYPES,
+  RUN_MODE_LABELS,
+  stopPathFor,
+} from "../constants";
 import LeadModal from "../components/LeadModal";
+import QueueButton from "../components/QueueButton";
+import GeneratedPitch from "../components/GeneratedPitch";
+import useGeneratePitch from "../hooks/useGeneratePitch";
 
 function StarRating({ value }) {
   return (
@@ -125,6 +133,81 @@ function PageSpeedPanel({ website, cached, onCheck, checking, error }) {
   );
 }
 
+// ── Queue strip ─────────────────────────────────────────────────────────────────
+// Where this lead sits in the day, and the one action that follows from it.
+// Mid-run it talks about the run; otherwise it talks about today's plan.
+// Adding appends rather than jumping the line — reordering is one tap away on
+// /run or /today, and silently reshuffling a drive you're mid-way through is the
+// worse default.
+function QueueStrip({
+  lead,
+  activeRun,
+  inPlan,
+  onOpenRun,
+  onOpenToday,
+  onGoToStop,
+}) {
+  const index = activeRun ? activeRun.queue.indexOf(lead.id) : -1;
+  const inRun = index !== -1;
+  const isDone = !!activeRun?.done?.[lead.id];
+
+  const accent = activeRun
+    ? "border-blue-900/50 bg-blue-950/20"
+    : inPlan
+      ? "border-slate-800 bg-slate-900/30"
+      : "border-slate-800/60 bg-slate-900/20";
+
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 ${accent}`}
+    >
+      <span
+        className={`w-2 h-2 rounded-full shrink-0 ${
+          activeRun ? "bg-blue-400" : inPlan ? "bg-slate-500" : "bg-slate-700"
+        }`}
+      />
+      <p className="text-slate-300 text-sm flex-1 min-w-0 truncate">
+        {activeRun ? (
+          inRun ? (
+            <>
+              Stop {index + 1} of {activeRun.queue.length}
+              {isDone && <span className="text-green-400"> · logged</span>}
+            </>
+          ) : (
+            <>
+              {RUN_MODE_LABELS[activeRun.mode] || "Run"} in progress
+              <span className="text-slate-500"> · this lead isn't in it</span>
+            </>
+          )
+        ) : inPlan ? (
+          <>On today's plan</>
+        ) : (
+          <span className="text-slate-500">Not on today's list</span>
+        )}
+      </p>
+
+      {activeRun && inRun ? (
+        <button
+          onClick={() => onGoToStop(index)}
+          className="shrink-0 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          {isDone ? "Open run →" : "Work this stop →"}
+        </button>
+      ) : (
+        <>
+          <QueueButton leadId={lead.id} size="compact" />
+          <button
+            onClick={activeRun ? onOpenRun : onOpenToday}
+            className="shrink-0 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Open
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CallTimer({ onLog }) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -219,12 +302,24 @@ export default function LeadDetail() {
   const leads = useCRMStore((s) => s.leads) ?? [];
   const customColumns = useCRMStore((s) => s.customColumns) ?? [];
   const groups = useCRMStore((s) => s.groups) ?? [];
-  const updateLead = useCRMStore((s) => s.updateLead);
-  const deleteNoteEntry = useCRMStore((s) => s.deleteNoteEntry);
-  const logTouchpoint = useCRMStore((s) => s.logTouchpoint);
   const geocache = useCRMStore((s) => s.geocache) ?? {};
   const pageSpeedCache = useCRMStore((s) => s.pageSpeedCache) ?? {};
+  const activeRun = useCRMStore((s) => s.activeRun);
+  const dailyPlan = useCRMStore((s) => s.dailyPlan) ?? [];
+
+  // Actions off getState() — persist strips functions during hydration, so
+  // selecting them can hand back undefined after a refresh.
+  const updateLead = useCRMStore.getState().updateLead;
+  const deleteNoteEntry = useCRMStore.getState().deleteNoteEntry;
+  const logTouchpoint = useCRMStore.getState().logTouchpoint;
   const setPageSpeed = useCRMStore.getState().setPageSpeed;
+  const setRunCursor = useCRMStore.getState().setRunCursor;
+  const clearLeadPitch = useCRMStore.getState().clearLeadPitch;
+  const {
+    generate: generatePitch,
+    pendingId: pitchPending,
+    error: pitchError,
+  } = useGeneratePitch();
 
   const lead = leads.find((l) => l.id === id);
 
@@ -290,6 +385,17 @@ export default function LeadDetail() {
     } finally {
       setSpeedChecking(false);
     }
+  };
+
+  const handleGoToStop = (index) => {
+    const run = useCRMStore.getState().activeRun;
+    if (!run) return;
+    if (run.done?.[lead.id]) {
+      navigate("/run");
+      return;
+    }
+    setRunCursor(index);
+    navigate(stopPathFor(run.mode, lead));
   };
 
   const notesLog = [...(lead.notesLog || [])].reverse();
@@ -389,6 +495,16 @@ export default function LeadDetail() {
           </button>
         </div>
 
+        {/* Where this lead sits in the day */}
+        <QueueStrip
+          lead={lead}
+          activeRun={activeRun}
+          inPlan={dailyPlan.some((i) => i.leadId === lead.id)}
+          onOpenRun={() => navigate("/run")}
+          onOpenToday={() => navigate("/today")}
+          onGoToStop={handleGoToStop}
+        />
+
         {/* Contact info */}
         <section className="rounded-xl border border-slate-800 bg-slate-900/30 px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Owner" value={lead.ownerName} />
@@ -484,6 +600,65 @@ export default function LeadDetail() {
           checking={speedChecking}
           error={speedError}
         />
+
+        {/* Generated pitch */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+              Pitch
+            </p>
+            <div className="flex items-center gap-3">
+              {lead.generatedPitch && (
+                <button
+                  onClick={() => clearLeadPitch(lead.id)}
+                  className="text-xs text-slate-600 hover:text-red-400 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                onClick={() => generatePitch(lead)}
+                disabled={!!pitchPending}
+                className="text-xs text-purple-400 hover:text-purple-300 disabled:opacity-40 transition-colors"
+              >
+                {pitchPending === lead.id
+                  ? "Writing…"
+                  : lead.generatedPitch
+                    ? "Rewrite"
+                    : "Write pitch"}
+              </button>
+            </div>
+          </div>
+
+          {pitchError && <p className="text-xs text-red-400">{pitchError}</p>}
+
+          {pitchPending === lead.id ? (
+            <div className="rounded-xl border border-slate-800 bg-slate-900/20 px-5 py-8 text-center">
+              <p className="text-slate-500 text-sm animate-pulse">
+                Writing a pitch from this lead's history…
+              </p>
+            </div>
+          ) : lead.generatedPitch ? (
+            <>
+              <GeneratedPitch lead={lead} />
+              <p className="text-xs text-slate-700">
+                Written{" "}
+                {new Date(lead.generatedPitch.generatedAt).toLocaleDateString(
+                  "en-US",
+                  { month: "short", day: "numeric" },
+                )}
+              </p>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/20 px-5 py-6 text-center space-y-1">
+              <p className="text-slate-500 text-sm">No pitch written yet.</p>
+              <p className="text-slate-700 text-xs">
+                Built from this lead's status, notes and site speed — not a
+                template.
+              </p>
+            </div>
+          )}
+        </section>
 
         {/* Log a Touchpoint */}
         <section className="space-y-3">

@@ -69,3 +69,65 @@ export function isAging(lead) {
   if (days === null) return true;
   return days >= threshold;
 }
+
+// ── Generated pitches ───────────────────────────────────────────────────────────
+// A pitch is written against a snapshot of the lead. Once the story moves on —
+// the status changed, or notes were logged since — the pitch may be arguing from
+// facts that are no longer true, so the UI says so rather than quietly serving
+// a stale script during a walk-in.
+export function isPitchStale(lead) {
+  const basedOn = lead?.generatedPitch?.basedOn;
+  if (!basedOn) return false;
+  if (basedOn.status !== lead.status) return true;
+  return basedOn.notesCount !== (lead.notesLog || []).length;
+}
+
+export function pitchStaleReason(lead) {
+  const basedOn = lead?.generatedPitch?.basedOn;
+  if (!basedOn) return null;
+  if (basedOn.status !== lead.status)
+    return `Written when this lead was ${basedOn.status}`;
+  const added = (lead.notesLog || []).length - basedOn.notesCount;
+  if (added > 0)
+    return `${added} touchpoint${added !== 1 ? "s" : ""} logged since`;
+  if (added < 0) return "Touchpoints were removed since";
+  return null;
+}
+
+// ── Runs ────────────────────────────────────────────────────────────────────────
+// A Run is a bounded working session over an ordered queue of leads. These
+// constants describe the three shapes a run can take and which HUD each stop
+// opens in.
+
+export const RUN_MODES = [
+  {
+    key: "walkins",
+    label: "Walk-ins",
+    hint: "Every stop opens in Pitch Mode",
+  },
+  {
+    key: "calls",
+    label: "Calls",
+    hint: "Every stop opens in Call Prep",
+  },
+  {
+    key: "mixed",
+    label: "Mixed",
+    hint: "Each stop follows the lead's own outreach type",
+  },
+];
+
+export const RUN_MODE_LABELS = {
+  walkins: "Walk-ins",
+  calls: "Calls",
+  mixed: "Mixed",
+};
+
+// Which HUD a given stop should open in, given the run's mode.
+// Mixed runs defer to the lead's own outreach type.
+export function stopPathFor(mode, lead) {
+  if (!lead) return "/";
+  if (mode === "walkins") return `/pitch/${lead.id}`;
+  if (mode === "calls") return `/call/${lead.id}`;
+  return lead.type === "Walk-in" ? `/pitch/${lead.id}` : `/call/${lead.id}`;
+}

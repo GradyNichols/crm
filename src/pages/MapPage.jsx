@@ -11,7 +11,8 @@ import {
 import L from "leaflet";
 import useCRMStore from "../store/useCRMStore";
 import EmptyState from "../components/EmptyState";
-import { STATUS_COLORS, STATUSES } from "../constants";
+import QueueButton from "../components/QueueButton";
+import { STATUS_COLORS, STATUSES, stopPathFor } from "../constants";
 
 // ── Pin colors ───────────────────────────────────────────────────────────────────
 const PIN_COLORS = {
@@ -303,6 +304,9 @@ function RoutePanel({
   onMove,
   onClear,
   onNavigate,
+  onStartRun,
+  onOpenRun,
+  runActive,
   homeBase,
 }) {
   if (route.length === 0) {
@@ -362,9 +366,15 @@ function RoutePanel({
               <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold shrink-0">
                 {i + 1}
               </span>
-              <p className="text-slate-200 text-xs flex-1 truncate">
+              {/* Tapping a stop opens the lead — the only way out of route mode
+                  and into a lead without losing the route. */}
+              <button
+                onClick={() => onNavigate(leadId)}
+                className="text-slate-200 hover:text-white text-xs flex-1 truncate text-left transition-colors"
+                title={`Open ${lead.businessName}`}
+              >
                 {lead.businessName}
-              </p>
+              </button>
               <div className="flex items-center gap-0.5 shrink-0">
                 <button
                   onClick={() => onMove(i, -1)}
@@ -430,13 +440,31 @@ function RoutePanel({
           );
         })}
       </div>
-      <div className="px-3 py-3 border-t border-slate-800">
+      <div className="px-3 py-3 border-t border-slate-800 space-y-2">
+        {/* The route stops evaporating here — starting a run persists this order
+            and every page can see where you are in it. */}
+        {runActive ? (
+          <button
+            onClick={onOpenRun}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors"
+          >
+            Open run in progress →
+          </button>
+        ) : (
+          <button
+            onClick={onStartRun}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors"
+          >
+            Start route run · {route.length} stop
+            {route.length !== 1 ? "s" : ""}
+          </button>
+        )}
         <button
           onClick={() => {
             const url = buildMapsUrl();
             if (url) window.open(url, "_blank");
           }}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+          className="w-full border border-slate-700 hover:border-slate-500 text-slate-300 text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -469,19 +497,34 @@ export default function Map() {
   const navigate = useNavigate();
   const leads = useCRMStore((s) => s.leads) ?? [];
   const geocache = useCRMStore((s) => s.geocache) ?? {};
-  const setGeocode = useCRMStore((s) => s.setGeocode);
-  const updateLead = useCRMStore((s) => s.updateLead);
   const homeBase = useCRMStore((s) => s.homeBase) ?? null;
+  const activeRun = useCRMStore((s) => s.activeRun);
+
+  // Actions off getState() — persist strips functions during hydration.
+  const setGeocode = useCRMStore.getState().setGeocode;
+  const updateLead = useCRMStore.getState().updateLead;
   const setHomeBase = useCRMStore.getState().setHomeBase;
+  const startRun = useCRMStore.getState().startRun;
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [geocoding, setGeocoding] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [resolved, setResolved] = useState({});
-  const [routeMode, setRouteMode] = useState(false);
-  const [route, setRoute] = useState([]);
+
+  // Coming back to the map mid-route restores the route you're driving.
+  const [routeMode, setRouteMode] = useState(() => {
+    const run = useCRMStore.getState().activeRun;
+    return run?.origin === "map";
+  });
+  const [route, setRoute] = useState(() => {
+    const run = useCRMStore.getState().activeRun;
+    return run?.origin === "map" ? [...run.queue] : [];
+  });
+
   const [showHomeModal, setShowHomeModal] = useState(false);
   const cancelRef = useRef(false);
+
+  const mapRunActive = activeRun?.origin === "map";
 
   const leadsWithAddress = leads.filter((l) => l.address?.trim());
   const filtered =
@@ -545,6 +588,14 @@ export default function Map() {
     });
   };
 
+  // A route is a physical drive, so it always starts as a walk-in run.
+  const handleStartRouteRun = () => {
+    const run = startRun({ mode: "walkins", origin: "map", queue: route });
+    if (!run) return;
+    const first = leads.find((l) => l.id === run.queue[0]);
+    navigate(stopPathFor("walkins", first));
+  };
+
   // Route polyline coords
   const routeCoords = route
     .map((id) => {
@@ -604,7 +655,8 @@ export default function Map() {
           <button
             onClick={() => {
               setRouteMode((r) => !r);
-              if (routeMode) setRoute([]);
+              // Don't wipe the route out from under a run that's using it.
+              if (routeMode && !mapRunActive) setRoute([]);
             }}
             className={`text-sm font-medium px-4 py-1.5 rounded-lg transition-colors border ${
               routeMode
@@ -807,12 +859,19 @@ export default function Map() {
                             </option>
                           ))}
                         </select>
-                        <button
-                          onClick={() => navigate(`/lead/${lead.id}`)}
-                          className="text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1 block"
-                        >
-                          View lead →
-                        </button>
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <button
+                            onClick={() =>
+                              navigate(`/lead/${lead.id}`, {
+                                state: { from: "/map" },
+                              })
+                            }
+                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                          >
+                            View lead →
+                          </button>
+                          <QueueButton leadId={lead.id} size="compact" />
+                        </div>
                       </div>
                     </Popup>
                   )}
@@ -834,6 +893,12 @@ export default function Map() {
               onRemove={(id) => setRoute((r) => r.filter((x) => x !== id))}
               onMove={moveRouteStop}
               onClear={() => setRoute([])}
+              onNavigate={(leadId) =>
+                navigate(`/lead/${leadId}`, { state: { from: "/map" } })
+              }
+              onStartRun={handleStartRouteRun}
+              onOpenRun={() => navigate("/run")}
+              runActive={mapRunActive}
               homeBase={homeBase}
             />
           )}

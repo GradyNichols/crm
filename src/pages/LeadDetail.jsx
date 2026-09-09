@@ -6,11 +6,16 @@ import {
   OUTREACH_TYPES,
   RUN_MODE_LABELS,
   stopPathFor,
+  EMAIL_KINDS,
+  inferEmailKind,
+  emailKindReason,
 } from "../constants";
 import LeadModal from "../components/LeadModal";
 import QueueButton from "../components/QueueButton";
 import GeneratedPitch from "../components/GeneratedPitch";
+import GeneratedEmail from "../components/GeneratedEmail";
 import useGeneratePitch from "../hooks/useGeneratePitch";
+import useGenerateEmail, { canGenerateEmail } from "../hooks/useGenerateEmail";
 
 function StarRating({ value }) {
   return (
@@ -315,11 +320,20 @@ export default function LeadDetail() {
   const setPageSpeed = useCRMStore.getState().setPageSpeed;
   const setRunCursor = useCRMStore.getState().setRunCursor;
   const clearLeadPitch = useCRMStore.getState().clearLeadPitch;
+  const clearLeadEmail = useCRMStore.getState().clearLeadEmail;
+  const portfolioUrl = useCRMStore((s) => s.portfolioUrl) ?? "";
   const {
     generate: generatePitch,
     pendingId: pitchPending,
     error: pitchError,
   } = useGeneratePitch();
+  const {
+    generate: generateEmail,
+    pendingId: emailPending,
+    error: emailError,
+  } = useGenerateEmail();
+  const [emailKind, setEmailKind] = useState(null); // null = follow the inference
+  const [showKinds, setShowKinds] = useState(false);
 
   const lead = leads.find((l) => l.id === id);
 
@@ -655,6 +669,137 @@ export default function LeadDetail() {
               <p className="text-slate-700 text-xs">
                 Built from this lead's status, notes and site speed — not a
                 template.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Generated email */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+              Email
+            </p>
+            <div className="flex items-center gap-3">
+              {lead.generatedEmail && (
+                <button
+                  onClick={() => clearLeadEmail(lead.id)}
+                  className="text-xs text-slate-600 hover:text-red-400 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+              {canGenerateEmail(portfolioUrl) && (
+                <button
+                  onClick={() => setShowKinds((v) => !v)}
+                  disabled={!!emailPending}
+                  className="text-xs text-sky-400 hover:text-sky-300 disabled:opacity-40 transition-colors"
+                >
+                  {emailPending === lead.id
+                    ? "Writing…"
+                    : lead.generatedEmail
+                      ? "Rewrite"
+                      : "Write email"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+
+          {/* The portfolio is the whole argument of the email. No link, no
+              email — a vague draft would be worse than none. */}
+          {!canGenerateEmail(portfolioUrl) ? (
+            <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/20 px-5 py-6 text-center space-y-2">
+              <p className="text-slate-500 text-sm">
+                Set your portfolio URL to write emails.
+              </p>
+              <p className="text-slate-700 text-xs max-w-xs mx-auto">
+                The email's only job is getting them to look at your work, so
+                the link isn't optional.
+              </p>
+              <button
+                onClick={() => navigate("/settings?action=pitch-mode")}
+                className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                Open Settings →
+              </button>
+            </div>
+          ) : showKinds && !emailPending ? (
+            <div className="rounded-xl border border-sky-900/50 bg-sky-950/15 px-4 py-4 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-sky-400 uppercase tracking-widest">
+                  What kind of email?
+                </p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Suggested from this lead — {emailKindReason(lead)}.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {EMAIL_KINDS.map((k) => {
+                  const suggested = inferEmailKind(lead) === k.key;
+                  return (
+                    <button
+                      key={k.key}
+                      onClick={() => {
+                        setEmailKind(k.key);
+                        setShowKinds(false);
+                        generateEmail(lead, k.key);
+                      }}
+                      className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                        suggested
+                          ? "border-sky-700 bg-sky-950/30 hover:border-sky-500"
+                          : "border-slate-700 bg-slate-900/40 hover:border-slate-500"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-100 text-sm font-semibold">
+                          {k.label}
+                        </span>
+                        {suggested && (
+                          <span className="text-[0.65rem] text-sky-400 uppercase tracking-widest">
+                            Suggested
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-slate-600 text-xs mt-0.5">{k.hint}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setShowKinds(false)}
+                className="w-full text-sm text-slate-500 hover:text-slate-300 py-1.5 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : emailPending === lead.id ? (
+            <div className="rounded-xl border border-slate-800 bg-slate-900/20 px-5 py-8 text-center">
+              <p className="text-slate-500 text-sm animate-pulse">
+                Writing a{" "}
+                {(
+                  EMAIL_KINDS.find(
+                    (k) => k.key === (emailKind || inferEmailKind(lead)),
+                  ) || {}
+                ).label?.toLowerCase()}{" "}
+                email…
+              </p>
+            </div>
+          ) : lead.generatedEmail ? (
+            <GeneratedEmail lead={lead} />
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/20 px-5 py-6 text-center space-y-1">
+              <p className="text-slate-500 text-sm">No email drafted yet.</p>
+              <p className="text-slate-700 text-xs">
+                Would write a{" "}
+                <span className="text-slate-500">
+                  {(
+                    EMAIL_KINDS.find((k) => k.key === inferEmailKind(lead)) ||
+                    {}
+                  ).label?.toLowerCase()}
+                </span>{" "}
+                — {emailKindReason(lead)}.
               </p>
             </div>
           )}

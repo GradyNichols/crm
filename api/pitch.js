@@ -1,54 +1,13 @@
 import { parseModelJSON } from "./_json.js";
+import { buildLeadBrief } from "./_lead.js";
+
+// Re-exported so existing callers and tests keep importing it from here.
+export { buildLeadBrief };
 
 // One request can carry a single lead or a small batch. Batching amortises the
 // system prompt across the group and collapses N round trips into one, which is
 // what makes prepping a whole run cheap enough to do without thinking about it.
 export const MAX_BATCH = 6;
-
-// Builds the user-turn content from one lead's real data. Exported so it can be
-// unit-tested without an API key — the whole point of this endpoint is that the
-// pitch is grounded in this lead's specifics rather than a template, so what
-// goes into the prompt is the thing worth checking.
-export function buildLeadBrief(lead = {}) {
-  const lines = [
-    `Business: ${lead.businessName || "Unknown"}`,
-    lead.ownerName ? `Owner: ${lead.ownerName}` : null,
-    lead.address ? `Address: ${lead.address}` : null,
-    `Outreach type: ${lead.type || "Walk-in"}`,
-    `Status: ${lead.status || "Cold"} | Strength: ${lead.strength ?? "?"}/5`,
-    lead.lastTouchDate
-      ? `Last contacted: ${lead.lastTouchDate}${
-          lead.daysSinceTouch != null ? ` (${lead.daysSinceTouch}d ago)` : ""
-        }`
-      : "Last contacted: never",
-    lead.followUpDate ? `Follow-up due: ${lead.followUpDate}` : null,
-  ].filter(Boolean);
-
-  if (lead.website) {
-    lines.push(`Current website: ${lead.website}`);
-    if (lead.pageSpeed) {
-      const { score, lcp, status } = lead.pageSpeed;
-      lines.push(
-        `Site speed (Google PageSpeed): performance score ${score}/100, largest contentful paint ${lcp}s — rated ${status}.`,
-      );
-    } else {
-      lines.push("Site speed: not measured.");
-    }
-  } else {
-    lines.push("Current website: none found.");
-  }
-
-  const notes = Array.isArray(lead.notes) ? lead.notes : [];
-  lines.push(
-    notes.length
-      ? `\nTouchpoint history (oldest first):\n${notes.join("\n")}`
-      : "\nTouchpoint history: none yet — this is a first contact.",
-  );
-
-  if (lead.portfolioUrl) lines.push(`\nMy portfolio: ${lead.portfolioUrl}`);
-
-  return lines.join("\n");
-}
 
 // Same briefs, each tagged with the id the response must key against.
 export function buildBatchBrief(leads = []) {

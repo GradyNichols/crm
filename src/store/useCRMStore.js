@@ -125,6 +125,27 @@ const useCRMStore = create(
         }));
       },
 
+      // A sibling key rather than a `generated: { pitch, email }` wrapper: the
+      // wrapper is tidier but would need a migration of live lead data, and a
+      // lead can legitimately have both a spoken pitch and a written email.
+      setLeadEmail: (leadId, email) => {
+        set((s) => ({
+          leads: s.leads.map((l) =>
+            l.id === leadId ? { ...l, generatedEmail: email } : l,
+          ),
+        }));
+      },
+
+      clearLeadEmail: (leadId) => {
+        set((s) => ({
+          leads: s.leads.map((l) => {
+            if (l.id !== leadId) return l;
+            const { generatedEmail, ...rest } = l;
+            return rest;
+          }),
+        }));
+      },
+
       deleteNoteEntry: (leadId, noteId) => {
         set((s) => ({
           leads: s.leads.map((l) =>

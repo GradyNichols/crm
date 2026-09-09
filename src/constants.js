@@ -70,20 +70,20 @@ export function isAging(lead) {
   return days >= threshold;
 }
 
-// ── Generated pitches ───────────────────────────────────────────────────────────
-// A pitch is written against a snapshot of the lead. Once the story moves on —
-// the status changed, or notes were logged since — the pitch may be arguing from
-// facts that are no longer true, so the UI says so rather than quietly serving
-// a stale script during a walk-in.
-export function isPitchStale(lead) {
-  const basedOn = lead?.generatedPitch?.basedOn;
+// ── Generated content ───────────────────────────────────────────────────────────
+// Anything AI-written is produced against a snapshot of the lead. Once the story
+// moves on — the status changed, or notes were logged since — it may be arguing
+// from facts that are no longer true, so the UI says so rather than quietly
+// serving a stale script during a walk-in or a stale email at a desk.
+export function isGeneratedStale(lead, key = "generatedPitch") {
+  const basedOn = lead?.[key]?.basedOn;
   if (!basedOn) return false;
   if (basedOn.status !== lead.status) return true;
   return basedOn.notesCount !== (lead.notesLog || []).length;
 }
 
-export function pitchStaleReason(lead) {
-  const basedOn = lead?.generatedPitch?.basedOn;
+export function generatedStaleReason(lead, key = "generatedPitch") {
+  const basedOn = lead?.[key]?.basedOn;
   if (!basedOn) return null;
   if (basedOn.status !== lead.status)
     return `Written when this lead was ${basedOn.status}`;
@@ -92,6 +92,73 @@ export function pitchStaleReason(lead) {
     return `${added} touchpoint${added !== 1 ? "s" : ""} logged since`;
   if (added < 0) return "Touchpoints were removed since";
   return null;
+}
+
+export const isPitchStale = (lead) => isGeneratedStale(lead, "generatedPitch");
+export const pitchStaleReason = (lead) =>
+  generatedStaleReason(lead, "generatedPitch");
+export const isEmailStale = (lead) => isGeneratedStale(lead, "generatedEmail");
+export const emailStaleReason = (lead) =>
+  generatedStaleReason(lead, "generatedEmail");
+
+// ── Generated emails ────────────────────────────────────────────────────────────
+// There isn't one email — there are four jobs, and which one you're writing is
+// the single biggest lever on what comes out. It's also knowable from the lead's
+// own data, so the app infers it and shows its reasoning rather than asking.
+
+export const EMAIL_KINDS = [
+  {
+    key: "intro",
+    label: "Intro",
+    hint: "They've never heard from you",
+  },
+  {
+    key: "follow_up",
+    label: "Follow-up",
+    hint: "Continues a conversation you've already had",
+  },
+  {
+    key: "nudge",
+    label: "Nudge",
+    hint: "It's gone quiet — a light re-open",
+  },
+  {
+    key: "after_pitch",
+    label: "After a pitch",
+    hint: "You pitched — send the link and the price",
+  },
+];
+
+export const EMAIL_KIND_LABELS = Object.fromEntries(
+  EMAIL_KINDS.map((k) => [k.key, k.label]),
+);
+
+// Order matters: the most specific signal wins.
+export function inferEmailKind(lead) {
+  if (!lead) return "intro";
+  const notes = lead.notesLog || [];
+  const last = notes.length ? notes[notes.length - 1].text || "" : "";
+
+  // Pitch Mode and Call Prep both stamp their outcome into the note text.
+  if (/^\[(Pitch|Call):/.test(last)) return "after_pitch";
+  if (!lead.lastTouchDate && notes.length === 0) return "intro";
+  if (isAging(lead)) return "nudge";
+  if (lead.status === "Warm" || lead.status === "Waiting") return "follow_up";
+  return "follow_up";
+}
+
+// Why that kind was chosen, in the same words the UI can show.
+export function emailKindReason(lead) {
+  if (!lead) return "";
+  const notes = lead.notesLog || [];
+  const last = notes.length ? notes[notes.length - 1].text || "" : "";
+  if (/^\[(Pitch|Call):/.test(last)) return "you pitched them last";
+  if (!lead.lastTouchDate && notes.length === 0) return "no contact yet";
+  if (isAging(lead)) {
+    const days = daysSinceTouch(lead);
+    return days == null ? "gone quiet" : `quiet for ${days} days`;
+  }
+  return `${lead.status.toLowerCase()} and recently touched`;
 }
 
 // ── Runs ────────────────────────────────────────────────────────────────────────

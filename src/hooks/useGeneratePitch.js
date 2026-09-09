@@ -1,6 +1,6 @@
 import { useState } from "react";
 import useCRMStore from "../store/useCRMStore";
-import { daysSinceTouch } from "../constants";
+import { buildLeadPayload, leadSnapshot } from "../leadContext";
 
 // ── Pitch generation ────────────────────────────────────────────────────────────
 // One hook behind every trigger — Lead Detail, Pitch Mode, Call Prep, the
@@ -12,42 +12,6 @@ import { daysSinceTouch } from "../constants";
 
 // Keep in step with MAX_BATCH in api/pitch.js.
 const CHUNK = 6;
-
-// Everything the endpoint needs to write something specific to THIS lead.
-// Trimmed to the last 12 touchpoints: older history stops changing the pitch and
-// starts costing tokens.
-function buildPayload(lead, pageSpeedCache, portfolioUrl) {
-  const cached = lead.website ? pageSpeedCache[lead.website.trim()] : null;
-  return {
-    id: lead.id,
-    businessName: lead.businessName,
-    ownerName: lead.ownerName || "",
-    address: lead.address || "",
-    website: lead.website || "",
-    type: lead.type || "Walk-in",
-    status: lead.status,
-    strength: lead.strength,
-    lastTouchDate: lead.lastTouchDate || "",
-    followUpDate: lead.followUpDate || "",
-    daysSinceTouch: daysSinceTouch(lead),
-    notes: (lead.notesLog || []).slice(-12).map((n) => `[${n.ts}] ${n.text}`),
-    pageSpeed: cached
-      ? { score: cached.score, lcp: cached.lcp, status: cached.status }
-      : null,
-    portfolioUrl: portfolioUrl || "",
-  };
-}
-
-// The snapshot a pitch was written against — see isPitchStale() in constants.
-function snapshot(lead, pageSpeedCache) {
-  const cached = lead.website ? pageSpeedCache?.[lead.website.trim()] : null;
-  return {
-    status: lead.status,
-    notesCount: (lead.notesLog || []).length,
-    lastTouchDate: lead.lastTouchDate || "",
-    speedScore: cached?.score ?? null,
-  };
-}
 
 const chunk = (arr, size) =>
   arr.reduce(
@@ -84,7 +48,7 @@ export default function useGeneratePitch() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lead: buildPayload(lead, pageSpeedCache ?? {}, portfolioUrl),
+          lead: buildLeadPayload(lead, pageSpeedCache ?? {}, portfolioUrl),
         }),
       });
       const data = await res.json();
@@ -93,7 +57,7 @@ export default function useGeneratePitch() {
       const pitch = {
         ...data,
         generatedAt: new Date().toISOString(),
-        basedOn: snapshot(lead, pageSpeedCache),
+        basedOn: leadSnapshot(lead, pageSpeedCache),
       };
       setLeadPitch(lead.id, pitch);
       return pitch;
@@ -128,7 +92,7 @@ export default function useGeneratePitch() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             leads: group.map((l) =>
-              buildPayload(l, pageSpeedCache ?? {}, portfolioUrl),
+              buildLeadPayload(l, pageSpeedCache ?? {}, portfolioUrl),
             ),
           }),
         });
@@ -142,7 +106,7 @@ export default function useGeneratePitch() {
           setLeadPitch(l.id, {
             ...p,
             generatedAt,
-            basedOn: snapshot(l, pageSpeedCache),
+            basedOn: leadSnapshot(l, pageSpeedCache),
           });
           written += 1;
         }

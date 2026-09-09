@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { emailStaleReason, EMAIL_KIND_LABELS } from "../constants";
 
@@ -11,6 +12,34 @@ import { emailStaleReason, EMAIL_KIND_LABELS } from "../constants";
 // Sending is invisible to the app, so "Log as sent" is what closes the loop —
 // without it the email lives outside the touchpoint history and the lead looks
 // untouched to every other screen.
+//
+// The model writes the message; the app owns the envelope. The greeting and the
+// sign-off are composed here at render and copy time rather than baked into the
+// stored draft, so editing your signature in Settings updates every email you've
+// already generated — and the model's 120-word budget stays spent on the message.
+
+// "Rosa Martinez" → "Rosa". A cold email that opens "Hi Rosa Martinez," reads
+// like a mail merge, and so does "Hi there" — with no name at all, plain "Hi,"
+// is the honest version.
+export function firstNameOf(ownerName = "") {
+  const first = String(ownerName).trim().split(/\s+/)[0] || "";
+  return /^[A-Za-z'’-]{2,}$/.test(first) ? first : "";
+}
+
+export function greetingFor(ownerName = "") {
+  const first = firstNameOf(ownerName);
+  return first ? `Hi ${first},` : "Hi,";
+}
+
+export function composeEmailBody(body, opts = {}) {
+  const { ownerName, senderName, signature } = opts;
+  const sign = [String(senderName || "").trim(), String(signature || "").trim()]
+    .filter(Boolean)
+    .join("\n");
+  return [greetingFor(ownerName), String(body || "").trim(), sign]
+    .filter(Boolean)
+    .join("\n\n");
+}
 
 function CopyIcon() {
   return (
@@ -33,6 +62,9 @@ function CopyIcon() {
 
 export default function GeneratedEmail({ lead, onSent }) {
   const email = lead?.generatedEmail;
+  const navigate = useNavigate();
+  const senderName = useCRMStore((s) => s.senderName) ?? "";
+  const signature = useCRMStore((s) => s.emailSignature) ?? "";
   const [copied, setCopied] = useState("");
   const [logged, setLogged] = useState(false);
 
@@ -40,7 +72,14 @@ export default function GeneratedEmail({ lead, onSent }) {
 
   const stale = emailStaleReason(lead);
   const hasAddress = !!lead.email?.trim();
-  const fullText = `Subject: ${email.subject}\n\n${email.body}`;
+  // What actually gets sent — greeting and sign-off composed around the stored
+  // message, so it's also what's shown and what's copied.
+  const composed = composeEmailBody(email.body, {
+    ownerName: lead.ownerName,
+    senderName,
+    signature,
+  });
+  const fullText = `Subject: ${email.subject}\n\n${composed}`;
 
   const copy = async (what, text) => {
     try {
@@ -55,7 +94,7 @@ export default function GeneratedEmail({ lead, onSent }) {
 
   const mailto = `mailto:${encodeURIComponent(lead.email || "")}?subject=${encodeURIComponent(
     email.subject,
-  )}&body=${encodeURIComponent(email.body)}`;
+  )}&body=${encodeURIComponent(composed)}`;
 
   const handleSent = () => {
     useCRMStore.getState().logTouchpoint(lead.id, {
@@ -114,15 +153,27 @@ export default function GeneratedEmail({ lead, onSent }) {
             Body
           </p>
           <button
-            onClick={() => copy("body", email.body)}
+            onClick={() => copy("body", composed)}
             className="text-xs text-slate-600 hover:text-slate-300 transition-colors"
           >
             {copied === "body" ? "Copied" : "Copy"}
           </button>
         </div>
         <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap rounded-lg bg-slate-900/50 border border-slate-800 px-3 py-3">
-          {email.body}
+          {composed}
         </p>
+        {!senderName.trim() && (
+          <p className="text-xs text-slate-600">
+            No sign-off — add your name in{" "}
+            <button
+              onClick={() => navigate("/settings?action=pitch-mode")}
+              className="text-blue-400 hover:text-blue-300 transition-colors underline underline-offset-2"
+            >
+              Settings
+            </button>
+            .
+          </p>
+        )}
       </div>
 
       {copied === "failed" && (

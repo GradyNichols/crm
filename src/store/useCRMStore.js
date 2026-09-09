@@ -21,6 +21,12 @@ const id = (prefix = "id") =>
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
+// Emails are signed by the app, not by the model, so the name has to live
+// somewhere editable. Seeded rather than empty: this key arrives after v1.0, and
+// an existing install rehydrating with "" would silently start sending unsigned
+// emails. `merge` uses ?? so clearing the field on purpose still sticks.
+const DEFAULT_SENDER_NAME = "Grady";
+
 // ── Run helpers ────────────────────────────────────────────────────────────────
 // The next stop that is neither completed nor skipped, searching forward from
 // `from` and then wrapping to the front so skipped stops come back around at the
@@ -394,11 +400,22 @@ const useCRMStore = create(
         set((s) => ({ pageSpeedCache: { ...s.pageSpeedCache, [url]: data } }));
       },
 
-      // ── Pitch Mode ────────────────────────────────────────────────────────────
+      // ── Outreach identity ─────────────────────────────────────────────────────
+      // What every generated pitch and email points at, and who they come from.
       portfolioUrl: "",
+      senderName: DEFAULT_SENDER_NAME,
+      emailSignature: "",
 
       setPortfolioUrl: (url) => {
         set({ portfolioUrl: url });
+      },
+
+      setSenderName: (name) => {
+        set({ senderName: name });
+      },
+
+      setEmailSignature: (sig) => {
+        set({ emailSignature: sig });
       },
 
       // ── Pipeline Advisor ──────────────────────────────────────────────────────
@@ -429,6 +446,8 @@ const useCRMStore = create(
           },
           pageSpeedCache: data.pageSpeedCache || {},
           portfolioUrl: data.portfolioUrl || "",
+          senderName: data.senderName ?? DEFAULT_SENDER_NAME,
+          emailSignature: data.emailSignature || "",
           // A restored backup describes a pipeline, not a session in progress.
           activeRun: null,
           lastRun: null,
@@ -713,6 +732,8 @@ const useCRMStore = create(
           homeBase: null,
           pageSpeedCache: {},
           portfolioUrl: "",
+          senderName: DEFAULT_SENDER_NAME,
+          emailSignature: "",
           pipelineAnalysis: null,
           activeRun: null,
           lastRun: null,
@@ -736,6 +757,8 @@ const useCRMStore = create(
         homeBase: s.homeBase,
         pageSpeedCache: s.pageSpeedCache,
         portfolioUrl: s.portfolioUrl,
+        senderName: s.senderName,
+        emailSignature: s.emailSignature,
         pipelineAnalysis: s.pipelineAnalysis,
         activeRun: s.activeRun,
         lastRun: s.lastRun,
@@ -759,6 +782,9 @@ const useCRMStore = create(
         homeBase: persisted.homeBase || null,
         pageSpeedCache: persisted.pageSpeedCache || {},
         portfolioUrl: persisted.portfolioUrl || "",
+        // ?? not ||: an intentionally cleared name must survive rehydration.
+        senderName: persisted.senderName ?? DEFAULT_SENDER_NAME,
+        emailSignature: persisted.emailSignature || "",
         pipelineAnalysis: persisted.pipelineAnalysis || null,
         // Runs written before `skipped` existed rehydrate with an empty map.
         activeRun: persisted.activeRun

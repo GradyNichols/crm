@@ -1,6 +1,6 @@
 import { useState } from "react";
 import useCRMStore from "../store/useCRMStore";
-import { buildLeadPayload, leadSnapshot } from "../leadContext";
+import { buildEmailPayload, leadSnapshot } from "../leadContext";
 import { inferEmailKind } from "../constants";
 
 // ── Email generation ────────────────────────────────────────────────────────────
@@ -24,8 +24,15 @@ export default function useGenerateEmail() {
   const generate = async (lead, kind) => {
     if (!lead || pendingId) return null;
 
-    const { pageSpeedCache, portfolioUrl, setLeadEmail } =
-      useCRMStore.getState();
+    const {
+      pageSpeedCache,
+      portfolioUrl,
+      setLeadEmail,
+      leads,
+      customColumns,
+      groups,
+      senderName,
+    } = useCRMStore.getState();
 
     if (!canGenerateEmail(portfolioUrl)) {
       setError(
@@ -43,7 +50,14 @@ export default function useGenerateEmail() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lead: buildLeadPayload(lead, pageSpeedCache ?? {}, portfolioUrl),
+          lead: buildEmailPayload(lead, {
+            pageSpeedCache: pageSpeedCache ?? {},
+            portfolioUrl,
+            leads: leads ?? [],
+            customColumns: customColumns ?? [],
+            groups: groups ?? [],
+            senderName: senderName ?? "",
+          }),
           kind: chosen,
         }),
       });

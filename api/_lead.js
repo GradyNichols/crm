@@ -42,7 +42,39 @@ export function buildLeadBrief(lead = {}) {
       : "\nTouchpoint history: none yet — this is a first contact.",
   );
 
+  // ── Additive email-only context ──────────────────────────────────────────────
+  // The pitch payload never carries these keys, so every block below is silent
+  // for /api/pitch and only appears when the email endpoint supplies it.
+
+  const custom = Array.isArray(lead.customFields) ? lead.customFields : [];
+  if (lead.groupName || custom.length) {
+    const extra = [
+      lead.groupName ? `Group: ${lead.groupName}` : null,
+      ...custom.map((f) => `${f.label}: ${f.value}`),
+    ].filter(Boolean);
+    lines.push(`\nWhat else he tracks on this lead:\n${extra.join("\n")}`);
+  }
+
+  if (lead.pitchAngle) {
+    lines.push(
+      `\nThe angle his pitch script already takes with this restaurant:\n"${lead.pitchAngle}"`,
+    );
+  }
+
+  if (lead.socialProof && lead.socialProof.closed > 0) {
+    const { closed, areas } = lead.socialProof;
+    const where = areas && areas.length ? ` in ${areas.join(", ")}` : "";
+    lines.push(
+      `\nHis track record: ${closed} restaurant${
+        closed === 1 ? "" : "s"
+      }${where} have hired him. These are counts from his own pipeline — never name a client, never round them up.`,
+    );
+  }
+
+  if (lead.today) lines.push(`\nToday's date: ${lead.today}`);
+
   if (lead.portfolioUrl) lines.push(`\nMy portfolio: ${lead.portfolioUrl}`);
+  if (lead.senderName) lines.push(`His first name: ${lead.senderName}`);
 
   return lines.join("\n");
 }

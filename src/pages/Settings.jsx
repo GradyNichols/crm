@@ -14,6 +14,94 @@ const FIELD_TYPES = [
 
 const EMPTY_FORM = { label: "", type: "text", options: "" };
 
+// ── SavedField ──────────────────────────────────────────────────────────────────
+// Three settings now share the same shape — a value, a draft, a Save button and a
+// confirmation that fades. Written once so the Outreach section can't drift into
+// three slightly different save behaviours.
+function SavedField({
+  label,
+  hint,
+  value,
+  onSave,
+  placeholder,
+  multiline = false,
+  rows = 3,
+  children,
+}) {
+  const [draft, setDraft] = useState(value);
+  const [saved, setSaved] = useState(false);
+
+  // Keeps the draft honest if the value changes underneath (a restored backup).
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const save = () => {
+    onSave(multiline ? draft.replace(/[ \t]+$/gm, "").trim() : draft.trim());
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  const btnClass = `text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0 ${
+    saved
+      ? "bg-green-600 text-white"
+      : "bg-blue-600 hover:bg-blue-500 text-white"
+  }`;
+
+  const inputClass =
+    "flex-1 bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors";
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-slate-200 text-sm font-medium">{label}</p>
+        {hint && <p className="text-slate-600 text-xs mt-0.5">{hint}</p>}
+      </div>
+
+      {multiline ? (
+        <div className="space-y-2">
+          <textarea
+            rows={rows}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setSaved(false);
+            }}
+            placeholder={placeholder}
+            className={`${inputClass} w-full resize-none leading-relaxed`}
+          />
+          <div className="flex justify-end">
+            <button onClick={save} className={btnClass}>
+              {saved ? "✓ Saved" : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setSaved(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+            }}
+            placeholder={placeholder}
+            className={inputClass}
+          />
+          <button onClick={save} className={btnClass}>
+            {saved ? "✓ Saved" : "Save"}
+          </button>
+        </div>
+      )}
+
+      {children}
+    </div>
+  );
+}
+
 function DeleteConfirmModal({ col, label, onConfirm, onCancel }) {
   return (
     <div
@@ -81,6 +169,8 @@ function exportBackup(state) {
     notifSettings: state.notifSettings,
     pageSpeedCache: state.pageSpeedCache,
     portfolioUrl: state.portfolioUrl,
+    senderName: state.senderName,
+    emailSignature: state.emailSignature,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
@@ -186,8 +276,10 @@ export default function Settings() {
   const setNotificationSettings = useCRMStore.getState().setNotifSettings;
   const portfolioUrl = useCRMStore((s) => s.portfolioUrl) ?? "";
   const setPortfolioUrl = useCRMStore.getState().setPortfolioUrl;
-  const [portfolioDraft, setPortfolioDraft] = useState(portfolioUrl);
-  const [portfolioSaved, setPortfolioSaved] = useState(false);
+  const senderName = useCRMStore((s) => s.senderName) ?? "";
+  const setSenderName = useCRMStore.getState().setSenderName;
+  const emailSignature = useCRMStore((s) => s.emailSignature) ?? "";
+  const setEmailSignature = useCRMStore.getState().setEmailSignature;
   const [notifPermission, setNotifPermission] = useState(() =>
     "Notification" in window ? Notification.permission : "unsupported",
   );
@@ -313,61 +405,69 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ── Pitch Mode ── */}
+      {/* ── Outreach ── */}
+      {/* id stays "pitch-section": Lead Detail and Pitch Mode both deep-link
+          here with ?action=pitch-mode. */}
       <section id="pitch-section">
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
-          Pitch Mode
+          Outreach
         </h3>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-5 py-5 space-y-3">
-          <div>
-            <p className="text-slate-200 text-sm font-medium">Portfolio URL</p>
-            <p className="text-slate-600 text-xs mt-0.5">
-              Shown as a one-tap link inside Pitch Mode for every lead.
+        <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-5 py-5 space-y-6">
+          <SavedField
+            label="Portfolio URL"
+            hint="A one-tap link in Pitch Mode, and the only link in every generated email."
+            value={portfolioUrl}
+            onSave={setPortfolioUrl}
+            placeholder="yourportfolio.com"
+          >
+            <p className="text-xs text-slate-700">
+              To surface pitch scripts inside Pitch Mode, mark a{" "}
+              <button
+                onClick={() => navigate("/reference")}
+                className="text-blue-400 hover:text-blue-300 transition-colors underline underline-offset-2"
+              >
+                Reference card
+              </button>{" "}
+              with the pin icon.
             </p>
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={portfolioDraft}
-              onChange={(e) => {
-                setPortfolioDraft(e.target.value);
-                setPortfolioSaved(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  setPortfolioUrl(portfolioDraft.trim());
-                  setPortfolioSaved(true);
-                  setTimeout(() => setPortfolioSaved(false), 1500);
-                }
-              }}
-              placeholder="yourportfolio.com"
-              className="flex-1 bg-slate-800/60 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-            />
-            <button
-              onClick={() => {
-                setPortfolioUrl(portfolioDraft.trim());
-                setPortfolioSaved(true);
-                setTimeout(() => setPortfolioSaved(false), 1500);
-              }}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0 ${
-                portfolioSaved
-                  ? "bg-green-600 text-white"
-                  : "bg-blue-600 hover:bg-blue-500 text-white"
-              }`}
-            >
-              {portfolioSaved ? "✓ Saved" : "Save"}
-            </button>
-          </div>
-          <p className="text-xs text-slate-700">
-            To surface pitch scripts inside Pitch Mode, mark a{" "}
-            <a
-              href="/reference"
-              className="text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              Reference card
-            </a>{" "}
-            with the pin icon.
-          </p>
+          </SavedField>
+
+          <div className="h-px bg-slate-800" />
+
+          <SavedField
+            label="Your name"
+            hint="Signs off every generated email. First name only reads warmer than a full name."
+            value={senderName}
+            onSave={setSenderName}
+            placeholder="Grady"
+          >
+            {!senderName.trim() && (
+              <p className="text-xs text-amber-600">
+                Emails will go out unsigned until this is set.
+              </p>
+            )}
+          </SavedField>
+
+          <div className="h-px bg-slate-800" />
+
+          <SavedField
+            label="Email signature"
+            hint="Sits under your name. Two or three lines — a phone number and what you do."
+            value={emailSignature}
+            onSave={setEmailSignature}
+            multiline
+            rows={3}
+            placeholder={
+              "Websites for restaurants — Simi Valley\n(805) 555-0142"
+            }
+          >
+            <p className="text-xs text-slate-700">
+              Leave the portfolio link out — it's already in the body of every
+              email, and twice reads like a template. Keep it short: a long
+              signature with titles and social links is what automated outreach
+              looks like.
+            </p>
+          </SavedField>
         </div>
       </section>
 

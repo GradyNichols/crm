@@ -1,5 +1,6 @@
 import { parseModelJSON } from "./_json.js";
 import { buildLeadBrief } from "./_lead.js";
+import { MODEL } from "./_model.js";
 
 // The four jobs an email can be doing. Which one applies is inferred from the
 // lead's own data client-side (inferEmailKind in constants.js) and passed in,
@@ -127,7 +128,7 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: MODEL,
         max_tokens: 1536,
         system: SYSTEM,
         messages: [

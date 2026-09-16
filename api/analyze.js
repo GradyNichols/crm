@@ -1,4 +1,5 @@
 import { parseModelJSON } from "./_json.js";
+import { MODEL } from "./_model.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -19,8 +20,12 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
+        model: MODEL,
+        // 4096 on Sonnet 4.6. Raised with the Sonnet 5 swap: the newer
+        // tokenizer costs ~30% more tokens for the same answer, and this is the
+        // one endpoint whose output grows with the size of the pipeline. A
+        // ceiling is not a charge — it only matters if the response reaches it.
+        max_tokens: 6144,
         system: `You are a sharp, direct sales coach reviewing a freelance web designer's restaurant outreach pipeline.
 The designer charges $500 per website and targets independent restaurants via cold calls, walk-ins, cold emails, and Yelp messages.
 Analyze the pipeline data and return a JSON object with exactly this structure:

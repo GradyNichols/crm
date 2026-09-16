@@ -1,5 +1,6 @@
 import { parseModelJSON } from "./_json.js";
 import { buildLeadBrief } from "./_lead.js";
+import { MODEL } from "./_model.js";
 
 // Re-exported so existing callers and tests keep importing it from here.
 export { buildLeadBrief };
@@ -87,7 +88,7 @@ async function callAnthropic({ system, content, maxTokens }) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: MODEL,
       max_tokens: maxTokens,
       system,
       messages: [{ role: "user", content }],

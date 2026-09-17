@@ -152,6 +152,27 @@ const useCRMStore = create(
         }));
       },
 
+      // ── Site research ───────────────────────────────────────────────────────
+      // What /api/research verified about the lead's website. Optional key,
+      // same pattern as the generated ones: it rides along with `leads`, so it
+      // needs no partialize/merge entry and is already in every backup.
+      // Clearing deletes the key so `"research" in lead` stays a reliable test.
+      setLeadResearch: (leadId, research) => {
+        set((s) => ({
+          leads: s.leads.map((l) => (l.id === leadId ? { ...l, research } : l)),
+        }));
+      },
+
+      clearLeadResearch: (leadId) => {
+        set((s) => ({
+          leads: s.leads.map((l) => {
+            if (l.id !== leadId) return l;
+            const { research, ...rest } = l;
+            return rest;
+          }),
+        }));
+      },
+
       deleteNoteEntry: (leadId, noteId) => {
         set((s) => ({
           leads: s.leads.map((l) =>

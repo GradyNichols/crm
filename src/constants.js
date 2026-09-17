@@ -75,11 +75,20 @@ export function isAging(lead) {
 // moves on — the status changed, or notes were logged since — it may be arguing
 // from facts that are no longer true, so the UI says so rather than quietly
 // serving a stale script during a walk-in or a stale email at a desk.
+//
+// Site research counts as part of the story: a pitch written before the site was
+// checked (or before it was re-checked) didn't know what the check found.
+// `basedOn.researchedAt` is absent on everything written before research
+// existed, and `?? null` on both sides keeps those from reading as stale.
+const researchChanged = (basedOn, lead) =>
+  (basedOn.researchedAt ?? null) !== (lead.research?.checkedAt ?? null);
+
 export function isGeneratedStale(lead, key = "generatedPitch") {
   const basedOn = lead?.[key]?.basedOn;
   if (!basedOn) return false;
   if (basedOn.status !== lead.status) return true;
-  return basedOn.notesCount !== (lead.notesLog || []).length;
+  if (basedOn.notesCount !== (lead.notesLog || []).length) return true;
+  return researchChanged(basedOn, lead);
 }
 
 export function generatedStaleReason(lead, key = "generatedPitch") {
@@ -91,6 +100,10 @@ export function generatedStaleReason(lead, key = "generatedPitch") {
   if (added > 0)
     return `${added} touchpoint${added !== 1 ? "s" : ""} logged since`;
   if (added < 0) return "Touchpoints were removed since";
+  if (researchChanged(basedOn, lead))
+    return lead.research
+      ? "Their website was checked since"
+      : "The website check was cleared since";
   return null;
 }
 
@@ -100,6 +113,49 @@ export const pitchStaleReason = (lead) =>
 export const isEmailStale = (lead) => isGeneratedStale(lead, "generatedEmail");
 export const emailStaleReason = (lead) =>
   generatedStaleReason(lead, "generatedEmail");
+
+// ── Site research ───────────────────────────────────────────────────────────────
+// `lead.research` is what /api/research found on the lead's website. Unlike a
+// pitch it isn't written against the lead's story — it's written against the
+// site, and sites change. So it goes stale two ways: by age, or because the
+// lead's website field now points somewhere else.
+
+export const RESEARCH_MAX_AGE_DAYS = 30;
+
+// "https://www.Joes.com/" and "joes.com" are the same site.
+export function sameSite(a = "", b = "") {
+  const norm = (u) =>
+    String(u || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/\/+$/, "");
+  return norm(a) === norm(b);
+}
+
+// Why the stored research can't be trusted as-is, or null if it can.
+export function researchStaleReason(lead, now = new Date()) {
+  const r = lead?.research;
+  if (!r) return null;
+  if (!lead.website?.trim()) return "This lead no longer has a website on file";
+  if (!sameSite(r.website, lead.website))
+    return "The website on this lead changed since it was checked";
+  const days = Math.floor((now - new Date(r.checkedAt)) / 86400000);
+  if (days >= RESEARCH_MAX_AGE_DAYS)
+    return `Checked ${days} days ago — sites change`;
+  return null;
+}
+
+// The ranked findings the pitch and email may state as fact. Only findings the
+// assessment led with, and only when they describe the site currently on file —
+// a check of an old URL says nothing about the new one.
+export function leadFindings(lead) {
+  const r = lead?.research;
+  if (!r || !lead.website?.trim() || !sameSite(r.website, lead.website))
+    return [];
+  return (r.findings || []).filter((f) => f.lead && f.text).map((f) => f.text);
+}
 
 // ── Generated emails ────────────────────────────────────────────────────────────
 // There isn't one email — there are four jobs, and which one you're writing is

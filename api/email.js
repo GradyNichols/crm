@@ -43,6 +43,7 @@ Body — you write the MESSAGE ONLY. The app adds the greeting and the signature
 - Return only valid JSON. Escape newlines inside the body as \\n.
 
 Using the context you are given:
+- Verified website findings: software checked these on their site, so they are safe to state plainly. When they're listed, the first one is the opening reason for writing, ahead of site speed. Never mention any website problem that isn't listed there or in the measured site speed.
 - Track record: if he has closed restaurants, it earns ONE short clause and never more — "a few restaurants around Simi Valley" reads human, a paragraph about his experience reads like a brochure. Use only the numbers and areas given. Never name a client, never imply more than the count supports. If no track record is given, say nothing about experience at all.
 - Pitch angle: if his pitch script already has an angle for this restaurant, the email makes that same argument in writing. Do not invent a second, different reason for writing, and do not copy the pitch wording verbatim — it was written to be spoken.
 - What else he tracks: these are his own private notes on the lead. Use them to aim the email; never quote them back or let the owner sense they are in a database.

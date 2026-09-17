@@ -35,6 +35,20 @@ export function buildLeadBrief(lead = {}) {
     lines.push("Current website: none found.");
   }
 
+  // Findings from /api/research, already ranked. Every line was verified by
+  // code fetching the site, which is why the prompts may state them as fact —
+  // and why nothing else about the site may be claimed. Silent when absent.
+  const findings = Array.isArray(lead.siteFindings)
+    ? lead.siteFindings.filter((f) => typeof f === "string" && f.trim())
+    : [];
+  if (findings.length) {
+    lines.push(
+      `Verified website findings${
+        lead.siteCheckedAt ? ` (checked ${lead.siteCheckedAt})` : ""
+      }, strongest first:\n${findings.map((f) => `- ${f}`).join("\n")}`,
+    );
+  }
+
   const notes = Array.isArray(lead.notes) ? lead.notes : [];
   lines.push(
     notes.length

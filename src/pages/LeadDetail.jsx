@@ -14,8 +14,10 @@ import LeadModal from "../components/LeadModal";
 import QueueButton from "../components/QueueButton";
 import GeneratedPitch from "../components/GeneratedPitch";
 import GeneratedEmail from "../components/GeneratedEmail";
+import LeadResearch from "../components/LeadResearch";
 import useGeneratePitch from "../hooks/useGeneratePitch";
 import useGenerateEmail, { canGenerateEmail } from "../hooks/useGenerateEmail";
+import useResearch, { canResearch } from "../hooks/useResearch";
 
 function StarRating({ value }) {
   return (
@@ -321,7 +323,14 @@ export default function LeadDetail() {
   const setRunCursor = useCRMStore.getState().setRunCursor;
   const clearLeadPitch = useCRMStore.getState().clearLeadPitch;
   const clearLeadEmail = useCRMStore.getState().clearLeadEmail;
+  const clearLeadResearch = useCRMStore.getState().clearLeadResearch;
   const portfolioUrl = useCRMStore((s) => s.portfolioUrl) ?? "";
+  const {
+    research: runResearch,
+    pendingId: researchPending,
+    error: researchError,
+    notice: researchNotice,
+  } = useResearch();
   const {
     generate: generatePitch,
     pendingId: pitchPending,
@@ -615,6 +624,84 @@ export default function LeadDetail() {
           error={speedError}
         />
 
+        {/* Site research — sits above the pitch because it feeds it */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+              Research
+            </p>
+            {canResearch(lead) && (
+              <div className="flex items-center gap-3">
+                {lead.research && (
+                  <button
+                    onClick={() => clearLeadResearch(lead.id)}
+                    className="text-xs text-slate-600 hover:text-red-400 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+                <button
+                  onClick={() => runResearch(lead)}
+                  disabled={!!researchPending}
+                  className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-40 transition-colors"
+                >
+                  {researchPending === lead.id
+                    ? "Checking…"
+                    : lead.research
+                      ? "Check again"
+                      : "Check their site"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {researchError && (
+            <p className="text-xs text-red-400">{researchError}</p>
+          )}
+          {researchNotice && !researchError && (
+            <p className="text-xs text-amber-500/90">{researchNotice}</p>
+          )}
+
+          {!canResearch(lead) ? (
+            <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/20 px-5 py-6 text-center space-y-1">
+              <p className="text-slate-500 text-sm">No website on file.</p>
+              <p className="text-slate-700 text-xs max-w-xs mx-auto">
+                If they have one, add it with Edit. If they don't, that's the
+                opening.
+              </p>
+            </div>
+          ) : researchPending === lead.id ? (
+            <div className="rounded-xl border border-slate-800 bg-slate-900/20 px-5 py-8 text-center space-y-1">
+              <p className="text-slate-500 text-sm animate-pulse">
+                Checking their site…
+              </p>
+              <p className="text-slate-700 text-xs">
+                Loads the page, tests the links and runs PageSpeed — up to a
+                minute.
+              </p>
+            </div>
+          ) : lead.research ? (
+            <>
+              <LeadResearch lead={lead} />
+              <p className="text-xs text-slate-700">
+                Checked{" "}
+                {new Date(lead.research.checkedAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/20 px-5 py-6 text-center space-y-1">
+              <p className="text-slate-500 text-sm">Not checked yet.</p>
+              <p className="text-slate-700 text-xs max-w-xs mx-auto">
+                Checks the menu, links, phone setup and speed. What it finds
+                feeds the pitch and the email.
+              </p>
+            </div>
+          )}
+        </section>
+
         {/* Generated pitch */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
@@ -667,8 +754,8 @@ export default function LeadDetail() {
             <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/20 px-5 py-6 text-center space-y-1">
               <p className="text-slate-500 text-sm">No pitch written yet.</p>
               <p className="text-slate-700 text-xs">
-                Built from this lead's status, notes and site speed — not a
-                template.
+                Built from this lead's status, notes, site speed and site check
+                — not a template.
               </p>
             </div>
           )}

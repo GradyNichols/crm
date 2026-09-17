@@ -1,4 +1,4 @@
-import { daysSinceTouch } from "./constants";
+import { daysSinceTouch, leadFindings } from "./constants";
 
 // ── Lead → API payload ──────────────────────────────────────────────────────────
 // Shared by useGeneratePitch and useGenerateEmail. Both generators need the same
@@ -25,7 +25,30 @@ export function buildLeadPayload(lead, pageSpeedCache = {}, portfolioUrl = "") {
     pageSpeed: cached
       ? { score: cached.score, lcp: cached.lcp, status: cached.status }
       : null,
+    // Verified by /api/research. Empty when the site hasn't been checked, or
+    // was checked at an address the lead no longer has — _lead.js stays silent.
+    siteFindings: leadFindings(lead),
+    siteCheckedAt: lead.research?.checkedAt?.slice(0, 10) || "",
     portfolioUrl: portfolioUrl || "",
+  };
+}
+
+// What /api/research needs to check one lead's site. `cachedSpeed` is passed
+// through only when it's recent enough to reuse, so the server skips a PSI run.
+export function buildResearchSubject(lead, cachedSpeed = null) {
+  return {
+    id: lead.id,
+    businessName: lead.businessName,
+    address: lead.address || "",
+    website: (lead.website || "").trim(),
+    pageSpeed: cachedSpeed
+      ? {
+          score: cachedSpeed.score,
+          lcp: cachedSpeed.lcp,
+          status: cachedSpeed.status,
+          checkedAt: cachedSpeed.checkedAt,
+        }
+      : null,
   };
 }
 
@@ -126,5 +149,6 @@ export function leadSnapshot(lead, pageSpeedCache = {}) {
     notesCount: (lead.notesLog || []).length,
     lastTouchDate: lead.lastTouchDate || "",
     speedScore: cached?.score ?? null,
+    researchedAt: lead.research?.checkedAt ?? null,
   };
 }

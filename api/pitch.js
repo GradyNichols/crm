@@ -19,7 +19,9 @@ export function buildBatchBrief(leads = []) {
 
 const RULES = `Rules:
 - Match the opener to the outreach type. A walk-in interrupts someone mid-shift; a phone call has about eight seconds.
-- If the site speed is bad, lead with it — it's a concrete, checkable fact, not an opinion.
+- If verified website findings are listed, build the hook on the first one — they're already ranked, and each is a checked fact he can say out loud.
+- If the site speed is bad and no verified findings are listed, lead with it — it's a concrete, checkable fact, not an opinion.
+- Never claim a problem with their website that isn't in the verified findings or the measured site speed.
 - If there's touchpoint history, reference it. Never reintroduce himself to someone he's already spoken to.
 - If the lead is Warm or Waiting, the pitch is a continuation, not a first contact.
 - Exactly 3 objections, and make them the ones THIS owner is likely to raise given their situation.

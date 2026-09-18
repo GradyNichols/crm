@@ -34,6 +34,57 @@ const RANK = { high: 3, medium: 2, low: 1 };
 
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
+// "Low", "low opportunity", "Medium-High", "strong" — all obviously mean one of
+// the three levels. Demanding the exact lowercase word threw away good answers
+// and reported them as unreadable, which is a worse failure than being lenient
+// about spelling: the value is only ever used to pick a label and a colour.
+const SYNONYMS = {
+  strong: "high",
+  good: "high",
+  great: "high",
+  moderate: "medium",
+  med: "medium",
+  mid: "medium",
+  fair: "medium",
+  weak: "low",
+  poor: "low",
+  none: "low",
+  minimal: "low",
+};
+
+export function level(v) {
+  const words = String(v ?? "")
+    .toLowerCase()
+    .replace(/[^a-z\s-]/g, " ")
+    .split(/[\s-]+/)
+    .filter(Boolean);
+  for (const w of words) {
+    if (LEVELS.includes(w)) return w;
+    if (SYNONYMS[w]) return SYNONYMS[w];
+  }
+  return null;
+}
+
+// The same tolerance for field names. The prompt asks for these exact keys;
+// this only catches the near misses a model actually makes.
+const ALIASES = {
+  picks: ["picks", "keys", "problems", "selected", "findings"],
+  opportunity: ["opportunity", "rating", "opportunity_level", "score"],
+  confidence: ["confidence", "certainty", "confidence_level"],
+  reason: ["reason", "why", "explanation", "rationale", "justification"],
+  chain: ["chain", "is_chain", "isChain", "likely_chain"],
+};
+
+export function coerceEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+  const out = {};
+  for (const [canonical, names] of Object.entries(ALIASES)) {
+    const key = names.find((n) => entry[n] !== undefined);
+    if (key !== undefined) out[canonical] = entry[key];
+  }
+  return out;
+}
+
 // ── Prompt ──────────────────────────────────────────────────────────────────────
 
 const SYSTEM = `You assess restaurant websites for a solo freelance web designer in Simi Valley, California. He builds custom websites for independent restaurants at a flat $500.
@@ -84,7 +135,9 @@ export function buildResearchBrief({ subject, checks, facts }) {
 // an exact id, a differently-cased id, the business name, position in an array,
 // and the bare object only when there was a single subject to begin with.
 
-const ENTRY_KEYS = ["picks", "opportunity", "confidence", "reason", "chain"];
+// Every name an entry's fields may arrive under (see ALIASES), so recognising
+// an answer and coercing it can't disagree.
+const ENTRY_KEYS = [...new Set(Object.values(ALIASES).flat())];
 
 export function looksLikeEntry(v) {
   return (
@@ -146,16 +199,28 @@ const CONFIDENCE_CAP = {
 
 const lower = (a, b) => (RANK[a] <= RANK[b] ? a : b);
 
-export function normalizeResearch(entry, facts) {
+export function normalizeResearch(rawEntry, facts) {
+  const entry = coerceEntry(rawEntry);
   const problems = facts?.problems || [];
   const byKey = new Map(problems.map((p) => [p.check, p]));
+  // Keys are lowercase snake_case; match forgivingly so "Slow" still lands on
+  // the verified fact rather than being dropped.
+  const resolveKey = (k) => {
+    const want = String(k ?? "")
+      .trim()
+      .toLowerCase();
+    if (!want) return null;
+    for (const p of problems)
+      if (p.check.toLowerCase() === want) return p.check;
+    return null;
+  };
   const assessed = !!entry && typeof entry === "object";
 
   let picks = [];
   if (assessed && Array.isArray(entry.picks)) {
-    for (const k of entry.picks) {
-      if (typeof k === "string" && byKey.has(k) && !picks.includes(k))
-        picks.push(k);
+    for (const raw of entry.picks) {
+      const k = resolveKey(raw);
+      if (k && !picks.includes(k)) picks.push(k);
       if (picks.length === 3) break;
     }
   }
@@ -175,17 +240,16 @@ export function normalizeResearch(entry, facts) {
   ];
 
   const cap = CONFIDENCE_CAP[facts?.quality] || "low";
-  const rawConfidence = LEVELS.includes(entry?.confidence)
-    ? entry.confidence
-    : "medium";
+  const opportunity = level(entry?.opportunity);
+  const rawConfidence = level(entry?.confidence) || "medium";
 
   return {
     findings,
-    opportunity: LEVELS.includes(entry?.opportunity) ? entry.opportunity : null,
+    opportunity,
     confidence: lower(rawConfidence, cap),
     reason: str(entry?.reason).slice(0, 240),
-    likelyChain: entry?.chain === true,
-    assessed: assessed && LEVELS.includes(entry?.opportunity),
+    likelyChain: entry?.chain === true || entry?.chain === "true",
+    assessed: assessed && !!opportunity,
     visibility: facts?.quality || "full",
     visibilityNote: facts?.qualityNote || "",
   };
@@ -297,7 +361,12 @@ async function assess(observations) {
       // ~250 tokens per restaurant on the newer tokenizer, plus headroom.
       max_tokens: 512 + observations.length * 450,
       system: SYSTEM,
-      messages: [{ role: "user", content }],
+      messages: [
+        { role: "user", content },
+        // Prefilling the reply with "{" removes the whole class of failures
+        // where the answer is fine but wrapped in a sentence or a code fence.
+        { role: "assistant", content: "{" },
+      ],
     }),
   });
 
@@ -307,9 +376,28 @@ async function assess(observations) {
   }
   const data = await response.json();
   return {
-    parsed: parseModelJSON(data.content?.[0]?.text ?? ""),
+    ...readModelJSON(data),
     truncated: data.stop_reason === "max_tokens",
   };
+}
+
+// Reads the model's answer defensively: every text block (not just the first,
+// which isn't guaranteed to be the text one), and both with and without the
+// prefilled brace, since a model may or may not treat it as already written.
+export function readModelJSON(data) {
+  const raw = (Array.isArray(data?.content) ? data.content : [])
+    .filter((c) => c?.type === "text" && typeof c.text === "string")
+    .map((c) => c.text)
+    .join("\n")
+    .trim();
+  // An empty answer must stay empty: the JSON repair pass would otherwise turn
+  // a bare prefilled brace into {}, which reads as a successful parse.
+  if (!raw) return { parsed: null, raw: "" };
+  const usable = (v) =>
+    !!v && typeof v === "object" && Object.keys(v).length > 0;
+  const withBrace = raw.startsWith("{") ? null : parseModelJSON(`{${raw}`);
+  const parsed = usable(withBrace) ? withBrace : parseModelJSON(raw);
+  return { parsed: usable(parsed) ? parsed : null, raw };
 }
 
 export function shapeResult(obs, entry, now = new Date()) {
@@ -369,10 +457,11 @@ export default async function handler(req, res) {
     // returned unrated rather than thrown away.
     let parsed = null;
     let truncated = false;
+    let raw = "";
     let assessError = "";
     if (judgeable.length) {
       try {
-        ({ parsed, truncated } = await assess(judgeable));
+        ({ parsed, truncated, raw } = await assess(judgeable));
       } catch (err) {
         assessError = err.message;
       }
@@ -396,9 +485,12 @@ export default async function handler(req, res) {
     if (!assessError && judgeable.length) {
       const unmatched = judgeable.filter((o) => !shaped[o.subject.id].assessed);
       if (unmatched.length === judgeable.length) {
+        // Quote what actually came back. A generic "couldn't be read" sent us
+        // round the houses twice; the first line of the answer names the cause.
+        const preview = raw ? ` It began: ${raw.slice(0, 160)}` : "";
         assessError = truncated
           ? "The rating was cut short. Try again."
-          : "The model's answer couldn't be read, so nothing was rated. The findings below were still verified.";
+          : `The model's answer couldn't be read, so nothing was rated. The findings below were still verified.${preview}`;
       }
     }
 

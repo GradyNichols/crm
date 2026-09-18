@@ -93,7 +93,9 @@ export default function useResearch() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Check failed");
-      if (data.assessError || !data.assessed) setNotice(UNRATED);
+      // A site that blocked the check isn't "unrated" — the card explains it.
+      if (data.assessError || (!data.assessed && data.visibility !== "blocked"))
+        setNotice(UNRATED);
       return saveResearch(lead, data);
     } catch (err) {
       setError(err.message);
@@ -136,7 +138,7 @@ export default function useResearch() {
           if (!r) continue;
           saveResearch(l, r);
           written += 1;
-          if (!r.assessed) unrated += 1;
+          if (!r.assessed && r.visibility !== "blocked") unrated += 1;
         }
       } catch (err) {
         lastError = err.message;

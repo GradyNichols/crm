@@ -94,8 +94,37 @@ export default function LeadResearch({ lead }) {
         </div>
       )}
 
-      {/* Claude's read */}
-      {r.assessed && opp ? (
+      {/* Nothing was verified, so there is nothing to rate. Saying "medium
+          opportunity" here would be an opinion with no evidence under it. */}
+      {r.visibility === "blocked" ? (
+        <div className="space-y-2">
+          <p className="text-slate-300 text-sm leading-relaxed">
+            Couldn't check this site.{" "}
+            {r.visibilityNote
+              ? `${r.visibilityNote.charAt(0).toUpperCase()}${r.visibilityNote.slice(1)}.`
+              : ""}
+          </p>
+          <p className="text-slate-600 text-xs leading-relaxed">
+            That's about their security setup, not their website — plenty of
+            restaurant platforms block automated visitors. Open it yourself to
+            judge it.
+          </p>
+          {lead.website && (
+            <a
+              href={
+                lead.website.startsWith("http")
+                  ? lead.website
+                  : `https://${lead.website}`
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-sm text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Open their site ↗
+            </a>
+          )}
+        </div>
+      ) : r.assessed && opp ? (
         <div className="space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span
@@ -127,33 +156,37 @@ export default function LeadResearch({ lead }) {
         </p>
       )}
 
-      {r.visibility && r.visibility !== "full" && r.visibilityNote && (
-        <p className="text-xs text-slate-500 leading-relaxed">
-          Limited view: {r.visibilityNote}.
-        </p>
-      )}
-
-      {/* Evidence */}
-      <div className="space-y-2">
-        <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-slate-500">
-          {leading.length ? "Worth raising" : "Findings"}
-        </p>
-        {leading.length > 0 ? (
-          <ul className="space-y-2.5">
-            {leading.map((f) => (
-              <Finding key={f.check} item={f} />
-            ))}
-          </ul>
-        ) : more.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            No problems found on what the check could read.
-          </p>
-        ) : (
-          <p className="text-sm text-slate-500">
-            Nothing here is strong enough to lead a pitch with.
+      {r.visibility &&
+        !["full", "blocked"].includes(r.visibility) &&
+        r.visibilityNote && (
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Limited view: {r.visibilityNote}.
           </p>
         )}
-      </div>
+
+      {/* Evidence */}
+      {r.visibility !== "blocked" && (
+        <div className="space-y-2">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-slate-500">
+            {leading.length ? "Worth raising" : "Findings"}
+          </p>
+          {leading.length > 0 ? (
+            <ul className="space-y-2.5">
+              {leading.map((f) => (
+                <Finding key={f.check} item={f} />
+              ))}
+            </ul>
+          ) : more.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No problems found on what the check could read.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">
+              Nothing here is strong enough to lead a pitch with.
+            </p>
+          )}
+        </div>
+      )}
 
       {more.length > 0 && (
         <div className="space-y-2">

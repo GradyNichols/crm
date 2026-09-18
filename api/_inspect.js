@@ -442,6 +442,34 @@ export function analyzeHtml(html = "", pageUrl = "") {
   };
 }
 
+// ── PageSpeed signals — pure ────────────────────────────────────────────────────
+// Google renders the page, so its request list fingerprints the platform even
+// when the site refused to serve us the HTML. Same fingerprints as the page
+// read; a host list that matches nothing gives null, not a guess.
+export function platformFromHosts(hosts = []) {
+  if (!Array.isArray(hosts) || hosts.length === 0) return null;
+  const joined = hosts.join(" ");
+  return PLATFORM_FINGERPRINTS.find(([, re]) => re.test(joined))?.[0] || null;
+}
+
+// Fills gaps in `checks` from a PageSpeed result. What we read ourselves always
+// wins; Google only fills what's missing, and `psiConfirmedLoad` records that
+// the site does load for someone.
+export function mergePsiSignals(checks = {}, speed = null, attempted = false) {
+  const out = { ...checks, psiAttempted: attempted };
+  if (!speed) return out;
+  out.psiConfirmedLoad = true;
+  const s = speed.signals || {};
+  if (out.viewport === undefined && typeof s.viewport === "boolean")
+    out.viewport = s.viewport;
+  if (!out.platform) {
+    const p = platformFromHosts(s.requestHosts);
+    if (p) out.platform = p;
+  }
+  if (!out.finalUrl && s.finalUrl) out.finalUrl = s.finalUrl;
+  return out;
+}
+
 // ── verifiedFacts — pure ────────────────────────────────────────────────────────
 // Turns raw checks into the only statements research is allowed to make.
 // `problems` are pickable findings; `context` is neutral background for the
@@ -476,6 +504,58 @@ const UNREACHABLE_REASON = {
   other: "the connection failed",
 };
 
+// Google's own render, for a site that wouldn't let us read it. Only the two
+// signals Google reports plainly: is there a mobile viewport tag, and is it
+// slow. Nothing is inferred about the parts we couldn't see.
+function psiOnlyFacts(checks, speed, qualityNote) {
+  const problems = [];
+  const context = [];
+  const url = checks.finalUrl || checks.url || "";
+
+  if (checks.viewport === false) {
+    problems.push({
+      check: "no_viewport",
+      text: "The homepage isn't set up for phones (no mobile viewport tag, measured by Google PageSpeed), so phones show a shrunken desktop layout.",
+      source: url,
+    });
+  } else if (checks.viewport === true) {
+    context.push("Has a mobile viewport tag (per Google PageSpeed)");
+  }
+
+  if (speed && typeof speed.score === "number") {
+    const lcp =
+      speed.lcp != null
+        ? `, with ${speed.lcp}s before the main content appears`
+        : "";
+    if (speed.status === "bad") {
+      problems.push({
+        check: "slow",
+        text: `Google PageSpeed scores the mobile site ${speed.score}/100${lcp}.`,
+        source: url,
+      });
+    } else {
+      context.push(
+        `Google PageSpeed mobile score ${speed.score}/100 (not flagged as slow)`,
+      );
+    }
+  }
+
+  if (checks.platform) context.push(platformContext(checks.platform));
+
+  problems.sort(
+    (a, b) =>
+      PROBLEM_PRIORITY.indexOf(a.check) - PROBLEM_PRIORITY.indexOf(b.check),
+  );
+  return { problems, context, quality: "psi_only", qualityNote };
+}
+
+const platformContext = (platform) =>
+  RESTAURANT_PLATFORMS.has(platform)
+    ? `Built with ${platform} (a paid restaurant website platform)`
+    : DIY_PLATFORMS.has(platform)
+      ? `Built with ${platform} (a do-it-yourself site builder)`
+      : `Built with ${platform}`;
+
 export function verifiedFacts(checks = {}, speed = null, now = new Date()) {
   const problems = [];
   const context = [];
@@ -495,27 +575,49 @@ export function verifiedFacts(checks = {}, speed = null, now = new Date()) {
     return { problems, context, quality: "full", qualityNote };
   }
 
-  if (!checks.reachable) {
+  // Blocked, or unreachable for us. If Google loaded the same page, the site is
+  // up and the problem is that it won't talk to us — saying "the site didn't
+  // load" there would be a false finding about their business.
+  if (checks.blocked || !checks.reachable) {
+    if (checks.psiConfirmedLoad) {
+      return psiOnlyFacts(
+        checks,
+        speed,
+        checks.blocked
+          ? "the site blocks automated checks, so only Google's PageSpeed data could be used"
+          : "the site didn't answer our check but loads for Google, so only Google's PageSpeed data could be used",
+      );
+    }
+
+    if (checks.blocked) {
+      return {
+        problems,
+        context: ["The site blocked the automated check"],
+        quality: "blocked",
+        qualityNote: checks.psiAttempted
+          ? "the site blocked the automated check and Google PageSpeed couldn't measure it either, so nothing could be verified"
+          : "the site blocked the automated check, so nothing on the page could be read",
+      };
+    }
+
     const why =
       checks.error === "http" && checks.status
         ? `the server returned ${checks.status}`
         : UNREACHABLE_REASON[checks.error] || UNREACHABLE_REASON.other;
-    add("unreachable", `The site didn't load when checked (${why}).`, url);
+    add(
+      "unreachable",
+      `The site didn't load when checked (${why})${
+        checks.psiAttempted
+          ? ", and Google PageSpeed couldn't load it either"
+          : ""
+      }.`,
+      url,
+    );
     return {
       problems,
       context,
       quality: "limited",
       qualityNote: "the site didn't load, which may be temporary",
-    };
-  }
-
-  if (checks.blocked) {
-    return {
-      problems,
-      context: ["The site blocked the automated check"],
-      quality: "blocked",
-      qualityNote:
-        "the site blocked the automated check, so nothing on the page could be read",
     };
   }
 
@@ -630,15 +732,7 @@ export function verifiedFacts(checks = {}, speed = null, now = new Date()) {
     add("no_tel_link", "The homepage has no tap-to-call link.");
   }
 
-  if (checks.platform) {
-    context.push(
-      RESTAURANT_PLATFORMS.has(checks.platform)
-        ? `Built with ${checks.platform} (a paid restaurant website platform)`
-        : DIY_PLATFORMS.has(checks.platform)
-          ? `Built with ${checks.platform} (a do-it-yourself site builder)`
-          : `Built with ${checks.platform}`,
-    );
-  }
+  if (checks.platform) context.push(platformContext(checks.platform));
   if (checks.ordering?.host && checks.ordering.host !== hostOf(url)) {
     context.push(`Online ordering links to ${hostLabel(checks.ordering.host)}`);
   }

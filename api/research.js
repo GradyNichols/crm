@@ -1,7 +1,12 @@
 import { parseModelJSON } from "./_json.js";
 import { MODEL } from "./_model.js";
 import { runPageSpeed } from "./_psi.js";
-import { inspectSite, verifiedFacts, PROBLEM_PRIORITY } from "./_inspect.js";
+import {
+  inspectSite,
+  verifiedFacts,
+  mergePsiSignals,
+  PROBLEM_PRIORITY,
+} from "./_inspect.js";
 
 // ── /api/research ───────────────────────────────────────────────────────────────
 // Checks a restaurant's website and says what's wrong with it — with evidence.
@@ -58,7 +63,7 @@ export function buildResearchBrief({ subject, checks, facts }) {
     }`,
     facts.quality === "full"
       ? "Visibility: full"
-      : `Visibility: ${facts.quality} — ${facts.qualityNote}`,
+      : `Visibility: limited — ${facts.qualityNote}`,
     "PROBLEMS (verified):",
     ...(facts.problems.length
       ? facts.problems.map((p) => `- [${p.check}] ${p.text}`)
@@ -74,7 +79,12 @@ export function buildResearchBrief({ subject, checks, facts }) {
 // ── Response shaping ────────────────────────────────────────────────────────────
 
 // What the check could see caps what the model may claim.
-const CONFIDENCE_CAP = { full: "high", limited: "medium", blocked: "low" };
+const CONFIDENCE_CAP = {
+  full: "high",
+  limited: "medium",
+  psi_only: "low",
+  blocked: "low",
+};
 
 const lower = (a, b) => (RANK[a] <= RANK[b] ? a : b);
 
@@ -183,21 +193,31 @@ export function compactChecks(checks = {}) {
 const PSI_TIMEOUT = 60000;
 
 async function observe(subject) {
-  const checks = await inspectSite(subject.website);
+  const rawChecks = await inspectSite(subject.website);
   let speed = subject.pageSpeed || null;
   let speedFetched = false;
-  const worthTiming =
-    checks.reachable && !checks.thirdParty && !checks.parked && !checks.blocked;
+  let attempted = !!speed;
+
+  // PageSpeed runs even when our own read failed or was refused. Google fetches
+  // from its own addresses and renders the page, so it's both a second opinion
+  // on whether the site is actually up and the only evidence available for a
+  // site behind bot protection. The one case worth skipping is a URL that isn't
+  // their site at all.
+  const worthTiming = !rawChecks.thirdParty && !rawChecks.parked;
   if (!speed && worthTiming) {
+    attempted = true;
     try {
-      speed = await runPageSpeed(checks.finalUrl || checks.url, {
+      speed = await runPageSpeed(rawChecks.finalUrl || rawChecks.url, {
         timeoutMs: PSI_TIMEOUT,
+        signals: true,
       });
       speedFetched = true;
     } catch {
       speed = null;
     }
   }
+
+  const checks = mergePsiSignals(rawChecks, speed, attempted);
   const facts = verifiedFacts(checks, speed);
   return { subject, checks, speed, speedFetched, facts };
 }
@@ -285,15 +305,23 @@ export default async function handler(req, res) {
   try {
     const observations = await Promise.all(list.map(observe));
 
+    // Nothing was verified about these sites, so there is nothing to judge.
+    // Asking anyway is how a site nobody could read came back rated "medium
+    // opportunity" — an opinion with no evidence under it, which is exactly
+    // what this feature exists not to produce.
+    const judgeable = observations.filter((o) => o.facts.quality !== "blocked");
+
     // If the model call fails, the verified findings still stand — they're
     // returned unrated rather than thrown away.
     let results = {};
     let truncated = false;
     let assessError = "";
-    try {
-      ({ results, truncated } = await assess(observations));
-    } catch (err) {
-      assessError = err.message;
+    if (judgeable.length) {
+      try {
+        ({ results, truncated } = await assess(judgeable));
+      } catch (err) {
+        assessError = err.message;
+      }
     }
 
     const now = new Date();

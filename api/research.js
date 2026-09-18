@@ -49,7 +49,7 @@ For each restaurant return:
 
 Return only valid JSON, no markdown:
 { "results": { "<ID>": { "picks": ["key"], "opportunity": "high", "confidence": "high", "reason": "…", "chain": false } } }
-Include every ID you were given.`;
+Include every ID you were given, keyed by that ID — including when there is only one restaurant.`;
 
 export function buildResearchBrief({ subject, checks, facts }) {
   const lines = [
@@ -74,6 +74,64 @@ export function buildResearchBrief({ subject, checks, facts }) {
       : ["- nothing further"]),
   ].filter(Boolean);
   return lines.join("\n");
+}
+
+// ── Matching the answer to the lead ─────────────────────────────────────────────
+// Asked about one restaurant, a model often answers with the assessment alone
+// rather than keyed by the id it was given — both are reasonable readings of the
+// instruction. Requiring the exact key threw away good answers and reported them
+// as "not rated", so the match is tolerant in ways that can't mix two leads up:
+// an exact id, a differently-cased id, the business name, position in an array,
+// and the bare object only when there was a single subject to begin with.
+
+const ENTRY_KEYS = ["picks", "opportunity", "confidence", "reason", "chain"];
+
+export function looksLikeEntry(v) {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    ENTRY_KEYS.some((k) => k in v)
+  );
+}
+
+export function pickEntry(parsed, subject, index = 0, count = 1) {
+  if (!parsed || typeof parsed !== "object") return undefined;
+  const results =
+    parsed.results && typeof parsed.results === "object"
+      ? parsed.results
+      : parsed;
+
+  if (Array.isArray(results)) {
+    const byId = results.find(
+      (r) => r && String(r.id || r.ID || "").trim() === String(subject.id),
+    );
+    if (looksLikeEntry(byId)) return byId;
+    return results.length === count && looksLikeEntry(results[index])
+      ? results[index]
+      : undefined;
+  }
+
+  if (looksLikeEntry(results[subject.id])) return results[subject.id];
+
+  const norm = (v) =>
+    String(v || "")
+      .trim()
+      .toLowerCase();
+  const byKey = (want) =>
+    Object.keys(results).find((k) => norm(k) === norm(want));
+  const idKey = byKey(subject.id);
+  if (idKey && looksLikeEntry(results[idKey])) return results[idKey];
+  const nameKey = subject.businessName ? byKey(subject.businessName) : null;
+  if (nameKey && looksLikeEntry(results[nameKey])) return results[nameKey];
+
+  // Only with a single subject: an unkeyed answer can only be about that one.
+  if (count === 1) {
+    if (looksLikeEntry(results)) return results;
+    const entries = Object.values(results).filter(looksLikeEntry);
+    if (entries.length === 1) return entries[0];
+  }
+  return undefined;
 }
 
 // ── Response shaping ────────────────────────────────────────────────────────────
@@ -248,14 +306,10 @@ async function assess(observations) {
     throw new Error(`Anthropic API error: ${err.slice(0, 300)}`);
   }
   const data = await response.json();
-  const parsed = parseModelJSON(data.content?.[0]?.text ?? "");
-  const results =
-    parsed?.results && typeof parsed.results === "object"
-      ? parsed.results
-      : parsed && typeof parsed === "object"
-        ? parsed
-        : {};
-  return { results, truncated: data.stop_reason === "max_tokens" };
+  return {
+    parsed: parseModelJSON(data.content?.[0]?.text ?? ""),
+    truncated: data.stop_reason === "max_tokens",
+  };
 }
 
 export function shapeResult(obs, entry, now = new Date()) {
@@ -313,24 +367,40 @@ export default async function handler(req, res) {
 
     // If the model call fails, the verified findings still stand — they're
     // returned unrated rather than thrown away.
-    let results = {};
+    let parsed = null;
     let truncated = false;
     let assessError = "";
     if (judgeable.length) {
       try {
-        ({ results, truncated } = await assess(judgeable));
+        ({ parsed, truncated } = await assess(judgeable));
       } catch (err) {
         assessError = err.message;
       }
     }
 
     const now = new Date();
+    const judgeIndex = new Map(judgeable.map((o, i) => [o.subject.id, i]));
     const shaped = Object.fromEntries(
-      observations.map((o) => [
-        o.subject.id,
-        shapeResult(o, results?.[o.subject.id], now),
-      ]),
+      observations.map((o) => {
+        const i = judgeIndex.get(o.subject.id);
+        const entry =
+          i === undefined
+            ? undefined
+            : pickEntry(parsed, o.subject, i, judgeable.length);
+        return [o.subject.id, shapeResult(o, entry, now)];
+      }),
     );
+
+    // Distinguish "the model errored" from "the model answered something we
+    // couldn't use" — otherwise both show up as a silent missing rating.
+    if (!assessError && judgeable.length) {
+      const unmatched = judgeable.filter((o) => !shaped[o.subject.id].assessed);
+      if (unmatched.length === judgeable.length) {
+        assessError = truncated
+          ? "The rating was cut short. Try again."
+          : "The model's answer couldn't be read, so nothing was rated. The findings below were still verified.";
+      }
+    }
 
     if (!batch) {
       return res.status(200).json({

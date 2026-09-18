@@ -59,6 +59,21 @@ function Finding({ item }) {
   );
 }
 
+// What their server actually did, in one line.
+const ERROR_WORDS = {
+  timeout: "Their server didn't respond in time.",
+  dns: "Their web address didn't resolve.",
+  refused: "Their server refused the connection.",
+  tls: "Their security certificate couldn't be verified.",
+  http: "Their server returned an error.",
+};
+
+function refusal(checks = {}) {
+  if (checks.status)
+    return `Their server answered ${checks.status} to the check.`;
+  return ERROR_WORDS[checks.error] || "";
+}
+
 // Neutral context worth a glance — what it's built on and who handles orders.
 function contextLine(checks = {}) {
   const bits = [];
@@ -104,6 +119,11 @@ export default function LeadResearch({ lead }) {
               ? `${r.visibilityNote.charAt(0).toUpperCase()}${r.visibilityNote.slice(1)}.`
               : ""}
           </p>
+          {/* The bare fact of what their server did, so "blocked" isn't a
+              black box — a 403 is a refusal, a timeout is something else. */}
+          {refusal(r.checks) && (
+            <p className="text-slate-500 text-xs">{refusal(r.checks)}</p>
+          )}
           <p className="text-slate-600 text-xs leading-relaxed">
             That's about their security setup, not their website — plenty of
             restaurant platforms block automated visitors. Open it yourself to

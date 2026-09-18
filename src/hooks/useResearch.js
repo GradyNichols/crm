@@ -61,6 +61,10 @@ export function saveResearch(lead, data) {
 const UNRATED =
   "Couldn't get a rating this time — the findings shown are still verified.";
 
+// The endpoint knows why it couldn't rate something; a generic message hides it.
+const unratedNotice = (data) =>
+  data?.assessError ? `Couldn't get a rating: ${data.assessError}` : UNRATED;
+
 export default function useResearch() {
   const [pendingId, setPendingId] = useState(null);
   const [bulk, setBulk] = useState(null); // { done, total }
@@ -95,7 +99,7 @@ export default function useResearch() {
       if (!res.ok) throw new Error(data.error || "Check failed");
       // A site that blocked the check isn't "unrated" — the card explains it.
       if (data.assessError || (!data.assessed && data.visibility !== "blocked"))
-        setNotice(UNRATED);
+        setNotice(unratedNotice(data));
       return saveResearch(lead, data);
     } catch (err) {
       setError(err.message);
@@ -119,6 +123,7 @@ export default function useResearch() {
     let written = 0;
     let unrated = 0;
     let lastError = "";
+    let lastUnrated = "";
 
     for (const group of chunk(targets, CHUNK)) {
       try {
@@ -138,7 +143,10 @@ export default function useResearch() {
           if (!r) continue;
           saveResearch(l, r);
           written += 1;
-          if (!r.assessed && r.visibility !== "blocked") unrated += 1;
+          if (!r.assessed && r.visibility !== "blocked") {
+            unrated += 1;
+            lastUnrated = unratedNotice(data);
+          }
         }
       } catch (err) {
         lastError = err.message;
@@ -155,7 +163,7 @@ export default function useResearch() {
         lastError || `${failed} of ${targets.length} checks didn't come back.`,
       );
     }
-    if (unrated > 0) setNotice(UNRATED);
+    if (unrated > 0) setNotice(lastUnrated || UNRATED);
     return { written, failed };
   };
 

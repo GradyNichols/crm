@@ -442,6 +442,22 @@ export function analyzeHtml(html = "", pageUrl = "") {
   };
 }
 
+// What kind of "website" an address is, without fetching anything. Discovery
+// needs this to tier a few hundred candidates, where a fetch each is out of the
+// question — and it's the same host lists inspectSite() uses, so a prospect and
+// a lead can't disagree about what counts as "not their own site".
+export function classifyWebsite(url = "") {
+  const raw = String(url || "").trim();
+  if (!raw) return { kind: "none", label: "" };
+  const host = hostOf(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+  if (!host) return { kind: "none", label: "" };
+  const thirdParty = matchHost(host, THIRD_PARTY_SITE_HOSTS);
+  if (thirdParty) return { kind: "third_party", label: hostLabel(host) };
+  const free = matchHost(host, FREE_SUBDOMAIN_HOSTS);
+  if (free) return { kind: "free_subdomain", label: free };
+  return { kind: "own", label: host };
+}
+
 // ── PageSpeed signals — pure ────────────────────────────────────────────────────
 // Google renders the page, so its request list fingerprints the platform even
 // when the site refused to serve us the HTML. Same fingerprints as the page

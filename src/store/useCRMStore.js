@@ -1,5 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  emptyProspecting,
+  mergeSweep,
+  acceptedTombstone,
+  dismissedTombstone,
+  pruneProspects,
+} from "../prospects";
 
 const migrateNotes = (lead) => {
   if (Array.isArray(lead.notesLog)) return lead;
@@ -451,6 +458,116 @@ const useCRMStore = create(
         set({ pipelineAnalysis: null });
       },
 
+      // ── Prospects ───────────────────────────────────────────────────────────
+      // Discovered restaurants, before they are leads. A holding area rather
+      // than rows in `leads`: a sweep brings back hundreds, and unqualified
+      // rows in the pipeline would flood Due, the stale flags, Progress and the
+      // Pipeline Advisor — which sends every lead in one prompt.
+      //
+      // { items: { [placeId]: item }, lastSweepAt, sweepCount }
+      prospecting: emptyProspecting(),
+
+      // Merges a sweep in, keeps tombstones, prunes anything untouched for 30
+      // days. All the logic is in ../prospects so it can be tested directly.
+      recordSweep: (candidates, at = new Date().toISOString()) => {
+        set((s) => ({
+          prospecting: mergeSweep(s.prospecting, candidates, {
+            at,
+            leads: s.leads,
+          }),
+        }));
+      },
+
+      setProspectResearch: (placeId, research) => {
+        set((s) => {
+          const item = s.prospecting.items[placeId];
+          if (!item) return {};
+          return {
+            prospecting: {
+              ...s.prospecting,
+              items: {
+                ...s.prospecting.items,
+                [placeId]: { ...item, research, stage: "researched" },
+              },
+            },
+          };
+        });
+      },
+
+      dismissProspect: (placeId, reason = "") => {
+        set((s) => {
+          const item = s.prospecting.items[placeId];
+          if (!item) return {};
+          return {
+            prospecting: {
+              ...s.prospecting,
+              items: {
+                ...s.prospecting.items,
+                [placeId]: dismissedTombstone(
+                  item,
+                  reason,
+                  new Date().toISOString(),
+                ),
+              },
+            },
+          };
+        });
+      },
+
+      // Promotes a prospect to a real lead, carrying its research across, and
+      // leaves a tombstone so a later sweep can't add it a second time.
+      // Returns the new lead's id.
+      acceptProspect: (placeId, { type = "Walk-in", groupId = null } = {}) => {
+        let leadId = null;
+        set((s) => {
+          const item = s.prospecting.items[placeId];
+          if (!item || item.stage === "accepted") return {};
+          const at = new Date().toISOString();
+          leadId = id("lead");
+          const lead = {
+            id: leadId,
+            businessName: item.name || "",
+            ownerName: "",
+            phone: item.phone || "",
+            email: "",
+            address: item.address || "",
+            website: item.website || "",
+            type,
+            // Strength is his read of a lead, not the tool's. It starts in the
+            // middle and he moves it.
+            strength: 3,
+            status: "Cold",
+            lastTouchDate: "",
+            followUpDate: "",
+            groupId,
+            notesLog: [],
+            source: "prospect",
+            placeId,
+            ...(item.research ? { research: item.research } : {}),
+          };
+          return {
+            leads: [...s.leads, lead],
+            prospecting: {
+              ...s.prospecting,
+              items: {
+                ...s.prospecting.items,
+                [placeId]: acceptedTombstone(item, leadId, at),
+              },
+            },
+          };
+        });
+        return leadId;
+      },
+
+      pruneProspecting: (now = new Date()) => {
+        set((s) => ({
+          prospecting: {
+            ...s.prospecting,
+            items: pruneProspects(s.prospecting.items, now),
+          },
+        }));
+      },
+
       // ── Backup / Restore ────────────────────────────────────────────────────
       restoreBackup: (data) => {
         set({
@@ -469,6 +586,7 @@ const useCRMStore = create(
           portfolioUrl: data.portfolioUrl || "",
           senderName: data.senderName ?? DEFAULT_SENDER_NAME,
           emailSignature: data.emailSignature || "",
+          prospecting: data.prospecting || emptyProspecting(),
           // A restored backup describes a pipeline, not a session in progress.
           activeRun: null,
           lastRun: null,
@@ -756,6 +874,7 @@ const useCRMStore = create(
           senderName: DEFAULT_SENDER_NAME,
           emailSignature: "",
           pipelineAnalysis: null,
+          prospecting: emptyProspecting(),
           activeRun: null,
           lastRun: null,
         });
@@ -781,6 +900,7 @@ const useCRMStore = create(
         senderName: s.senderName,
         emailSignature: s.emailSignature,
         pipelineAnalysis: s.pipelineAnalysis,
+        prospecting: s.prospecting,
         activeRun: s.activeRun,
         lastRun: s.lastRun,
       }),
@@ -807,6 +927,13 @@ const useCRMStore = create(
         senderName: persisted.senderName ?? DEFAULT_SENDER_NAME,
         emailSignature: persisted.emailSignature || "",
         pipelineAnalysis: persisted.pipelineAnalysis || null,
+        // Installs from before Prospects rehydrate with an empty collection.
+        prospecting: persisted.prospecting?.items
+          ? {
+              ...emptyProspecting(),
+              ...persisted.prospecting,
+            }
+          : emptyProspecting(),
         // Runs written before `skipped` existed rehydrate with an empty map.
         activeRun: persisted.activeRun
           ? {

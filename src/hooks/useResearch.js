@@ -42,14 +42,24 @@ export function reusableSpeed(cache, website, now = new Date()) {
   return age >= 0 && age < SPEED_REUSE_DAYS * 86400000 ? c : null;
 }
 
-// Endpoint response → stored research. Transport-only fields are dropped. A
-// PageSpeed run the server did on our behalf also lands in pageSpeedCache, so
-// the Site Speed panel and the pitch see it without a second check.
+// Endpoint response → the object that gets stored. Transport-only fields are
+// dropped here so every caller stores the same shape.
+export function toResearch(data = {}) {
+  const { speedFetched, assessError, truncated, error, raw, ...research } =
+    data;
+  return research;
+}
+
+// Endpoint response → stored research. A PageSpeed run the server did on our
+// behalf also lands in pageSpeedCache, so the Site Speed panel and the pitch
+// see it without a second check.
 export function saveResearch(lead, data) {
   const { setLeadResearch, setPageSpeed } = useCRMStore.getState();
-  const { speedFetched, assessError, truncated, error, ...research } = data;
+  const research = toResearch(data);
   setLeadResearch(lead.id, research);
-  if (speedFetched && research.speed && lead.website?.trim()) {
+  // `speedFetched` is a transport field: toResearch() strips it, so read it
+  // from the response rather than from the stored object.
+  if (data?.speedFetched && research.speed && lead.website?.trim()) {
     setPageSpeed(lead.website.trim(), {
       url: research.checks?.finalUrl || research.checks?.url || lead.website,
       ...research.speed,
@@ -73,7 +83,10 @@ export default function useResearch() {
 
   const busy = !!pendingId || !!bulk;
 
-  const research = async (lead) => {
+  // `save` is how the same engine serves two homes: leads store research on the
+  // lead, prospects store it on the prospect. Everything else — the request,
+  // the error handling, the one-at-a-time rule — stays shared.
+  const research = async (lead, { save = saveResearch } = {}) => {
     if (!lead || busy) return null;
     if (!canResearch(lead)) {
       setError("This lead has no website to check.");
@@ -100,7 +113,7 @@ export default function useResearch() {
       // A site that blocked the check isn't "unrated" — the card explains it.
       if (data.assessError || (!data.assessed && data.visibility !== "blocked"))
         setNotice(unratedNotice(data));
-      return saveResearch(lead, data);
+      return save(lead, data);
     } catch (err) {
       setError(err.message);
       return null;
@@ -111,7 +124,7 @@ export default function useResearch() {
 
   // For checking a list at once (Prospects, later). Sequential chunks; each
   // chunk's results are saved as they land, so a failure keeps what succeeded.
-  const researchMany = async (leadList) => {
+  const researchMany = async (leadList, { save = saveResearch } = {}) => {
     const targets = (leadList || []).filter(needsResearch);
     if (busy || targets.length === 0) return { written: 0, failed: 0 };
 
@@ -141,7 +154,7 @@ export default function useResearch() {
         for (const l of group) {
           const r = data.results?.[l.id];
           if (!r) continue;
-          saveResearch(l, r);
+          save(l, r);
           written += 1;
           if (!r.assessed && r.visibility !== "blocked") {
             unrated += 1;

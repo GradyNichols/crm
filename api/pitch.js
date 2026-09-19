@@ -103,10 +103,29 @@ async function callAnthropic({ system, content, maxTokens }) {
   }
 
   const data = await response.json();
-  return {
-    text: data.content?.[0]?.text ?? "",
-    stopReason: data.stop_reason,
-  };
+  // Every text block, not just the first. Reading `content[0].text` returns ""
+  // the moment the reply leads with any non-text block, and an empty string
+  // fails parsing with no hint that the model actually answered.
+  const text = Array.isArray(data.content)
+    ? data.content
+        .filter((b) => b?.type === "text" && typeof b.text === "string")
+        .map((b) => b.text)
+        .join("")
+    : "";
+  return { text, stopReason: data.stop_reason };
+}
+
+// A single request sometimes comes back in the batch shape — the system prompts
+// share a PITCH_SHAPE, and the model occasionally reaches for the wrapper. The
+// batch path already unwraps `pitches`; the single path used to treat that
+// object as a pitch, find no opener/hook/close on it, and report a parse
+// failure on a perfectly good answer.
+export function unwrapSingle(parsed, leadId) {
+  if (!parsed || typeof parsed !== "object") return parsed;
+  const inner = parsed.pitches;
+  if (!inner || typeof inner !== "object") return parsed;
+  const values = Object.values(inner);
+  return inner[leadId] ?? (values.length === 1 ? values[0] : null);
 }
 
 export default async function handler(req, res) {
@@ -149,7 +168,9 @@ export default async function handler(req, res) {
           error:
             stopReason === "max_tokens"
               ? "The batch was cut short. Try fewer leads at once."
-              : "Could not parse AI response.",
+              : text.trim()
+                ? `Could not parse AI response. The model said: ${text.trim().slice(0, 160)}`
+                : "The model returned an empty response. Try again.",
           raw: text.slice(0, 500),
         });
       }
@@ -183,14 +204,16 @@ export default async function handler(req, res) {
       maxTokens: 2048,
     });
 
-    const pitch = normalizePitch(parseModelJSON(text));
+    const pitch = normalizePitch(unwrapSingle(parseModelJSON(text), lead.id));
 
     if (!pitch) {
       return res.status(500).json({
         error:
           stopReason === "max_tokens"
             ? "The pitch was cut short. Try again."
-            : "Could not parse AI response.",
+            : text.trim()
+              ? `Could not parse AI response. The model said: ${text.trim().slice(0, 160)}`
+              : "The model returned an empty response. Try again.",
         raw: text.slice(0, 500),
       });
     }

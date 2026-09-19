@@ -93,6 +93,75 @@ export function repairTruncatedJSON(text) {
 }
 
 // Straight parse → extract a JSON blob from prose/markdown → repair truncation.
+// Escapes double quotes that appear *inside* a JSON string value.
+//
+// The models quote things. Asked to build a hook on a verified finding, one of
+// which is `browsers label it "Not secure"`, the reply comes back as
+//   "hook": "browsers label it "Not secure" before anyone sees the menu"
+// which is not JSON, and which repairTruncatedJSON can't help with — nothing is
+// truncated, the string tracking is simply desynced from the first stray quote
+// onward, so every brace after it is counted in the wrong state.
+//
+// A quote inside a string is treated as the real closing quote only when the
+// next non-whitespace character is one of `,:}]` or the end of input. Anything
+// else means the string is still going and the quote belongs to the prose, so
+// it gets escaped.
+//
+// Last resort by design: it runs only after a straight parse, a blob extract
+// and a truncation repair have all failed, so at worst it turns null into null.
+export function escapeStrayQuotes(text) {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  const s = text.slice(start);
+
+  let out = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      out += ch;
+      if (inString) escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      if (!inString) {
+        inString = true;
+        out += ch;
+        continue;
+      }
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      const next = s[j];
+      if (
+        next === undefined ||
+        next === "," ||
+        next === ":" ||
+        next === "}" ||
+        next === "]"
+      ) {
+        inString = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+
+  return out;
+}
+
+// Straight parse → extract a JSON blob from prose/markdown → repair truncation
+// → escape stray quotes inside values, then try both of those again.
 export function parseModelJSON(text) {
   try {
     return JSON.parse(text);
@@ -103,5 +172,15 @@ export function parseModelJSON(text) {
       return JSON.parse(match[0]);
     } catch {}
   }
-  return repairTruncatedJSON(text);
+
+  const repaired = repairTruncatedJSON(text);
+  if (repaired) return repaired;
+
+  const escaped = escapeStrayQuotes(text);
+  if (!escaped) return null;
+  try {
+    return JSON.parse(escaped);
+  } catch {}
+  // Stray quotes and a truncated tail can arrive together.
+  return repairTruncatedJSON(escaped);
 }

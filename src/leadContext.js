@@ -7,7 +7,15 @@ import { daysSinceTouch, leadFindings } from "./constants";
 
 // Trimmed to the last 12 touchpoints: older history stops changing the output
 // and starts costing tokens.
-export function buildLeadPayload(lead, pageSpeedCache = {}, portfolioUrl = "") {
+// `senderName` is who he is on the call. Without it the model has no name to
+// use and invents one — a generated opener once introduced him as "Dave", which
+// is a script he'd have read out loud to a stranger.
+export function buildLeadPayload(
+  lead,
+  pageSpeedCache = {},
+  portfolioUrl = "",
+  senderName = "",
+) {
   const cached = lead.website ? pageSpeedCache[lead.website.trim()] : null;
   return {
     id: lead.id,
@@ -30,6 +38,7 @@ export function buildLeadPayload(lead, pageSpeedCache = {}, portfolioUrl = "") {
     siteFindings: leadFindings(lead),
     siteCheckedAt: lead.research?.checkedAt?.slice(0, 10) || "",
     portfolioUrl: portfolioUrl || "",
+    senderName: senderName || "",
   };
 }
 
@@ -57,6 +66,9 @@ export function buildResearchSubject(lead, cachedSpeed = null) {
 // pitch script can't use in the moment. Everything below is additive: the pitch
 // payload never carries these keys, and buildLeadBrief only renders the sections
 // whose keys are present.
+//
+// `portfolioUrl` and `senderName` are the exceptions — both payloads carry them,
+// because both channels need the link and the name.
 
 // "1420 E Los Angeles Ave, Simi Valley, CA 93065" → "Simi Valley".
 // Second-to-last comma segment rather than a hardcoded town list, so this keeps
@@ -123,7 +135,7 @@ export function buildEmailPayload(
     senderName = "",
   } = {},
 ) {
-  const base = buildLeadPayload(lead, pageSpeedCache, portfolioUrl);
+  const base = buildLeadPayload(lead, pageSpeedCache, portfolioUrl, senderName);
   const group = (groups || []).find((g) => g.id === lead.groupId);
   const social = buildSocialProof(leads, lead.id);
 

@@ -40,7 +40,7 @@ export default function useGeneratePitch() {
     setPendingId(lead.id);
     setError("");
 
-    const { pageSpeedCache, portfolioUrl, setLeadPitch } =
+    const { pageSpeedCache, portfolioUrl, senderName, setLeadPitch } =
       useCRMStore.getState();
 
     try {
@@ -48,7 +48,12 @@ export default function useGeneratePitch() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lead: buildLeadPayload(lead, pageSpeedCache ?? {}, portfolioUrl),
+          lead: buildLeadPayload(
+            lead,
+            pageSpeedCache ?? {},
+            portfolioUrl,
+            senderName ?? "",
+          ),
         }),
       });
       const data = await res.json();
@@ -80,7 +85,7 @@ export default function useGeneratePitch() {
     setError("");
     setBulk({ done: 0, total: targets.length });
 
-    const { pageSpeedCache, portfolioUrl, setLeadPitch } =
+    const { pageSpeedCache, portfolioUrl, senderName, setLeadPitch } =
       useCRMStore.getState();
     let written = 0;
     let lastError = "";
@@ -92,7 +97,12 @@ export default function useGeneratePitch() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             leads: group.map((l) =>
-              buildLeadPayload(l, pageSpeedCache ?? {}, portfolioUrl),
+              buildLeadPayload(
+                l,
+                pageSpeedCache ?? {},
+                portfolioUrl,
+                senderName ?? "",
+              ),
             ),
           }),
         });

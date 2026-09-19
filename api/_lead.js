@@ -56,9 +56,11 @@ export function buildLeadBrief(lead = {}) {
       : "\nTouchpoint history: none yet — this is a first contact.",
   );
 
-  // ── Additive email-only context ──────────────────────────────────────────────
-  // The pitch payload never carries these keys, so every block below is silent
-  // for /api/pitch and only appears when the email endpoint supplies it.
+  // ── Additive context ─────────────────────────────────────────────────────────
+  // Every block below renders only when its key is present. `groupName`,
+  // `customFields`, `pitchAngle`, `socialProof` and `today` are email-only and
+  // stay silent for /api/pitch. `portfolioUrl` and `senderName` are carried by
+  // both payloads — the pitch needs the link to offer and the name to open with.
 
   const custom = Array.isArray(lead.customFields) ? lead.customFields : [];
   if (lead.groupName || custom.length) {

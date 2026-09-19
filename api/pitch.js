@@ -18,6 +18,7 @@ export function buildBatchBrief(leads = []) {
 }
 
 const RULES = `Rules:
+- If his first name is given, use exactly that name and no other. If it isn't, write an opener that needs no name — never invent one. He reads this out loud to a stranger; a name he doesn't answer to is worse than no name.
 - Match the opener to the outreach type. A walk-in interrupts someone mid-shift; a phone call has about eight seconds.
 - If verified website findings are listed, build the hook on the first one — they're already ranked, and each is a checked fact he can say out loud.
 - If the site speed is bad and no verified findings are listed, lead with it — it's a concrete, checkable fact, not an opinion.

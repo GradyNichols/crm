@@ -437,14 +437,15 @@ export default function Settings() {
 
           <SavedField
             label="Your name"
-            hint="Signs off every generated email. First name only reads warmer than a full name."
+            hint="Opens every generated pitch and signs every generated email. First name only reads warmer than a full name."
             value={senderName}
             onSave={setSenderName}
             placeholder="Grady"
           >
             {!senderName.trim() && (
               <p className="text-xs text-amber-600">
-                Emails will go out unsigned until this is set.
+                Emails go out unsigned and pitches open without a name until
+                this is set.
               </p>
             )}
           </SavedField>

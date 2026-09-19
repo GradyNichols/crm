@@ -344,11 +344,25 @@ async function observe(subject) {
   return { subject, checks, speed, speedFetched, facts };
 }
 
-async function assess(observations) {
+// The request body, built separately so a test can assert its shape without an
+// API key. The conversation must end with a user message: this model rejects an
+// assistant prefill outright ("This model does not support assistant message
+// prefill"), and a rejected request is a worse failure than a chatty answer —
+// readModelJSON() handles prose and code fences instead.
+export function buildAssessRequest(observations) {
   const content = `Assess these ${observations.length} restaurant website${
     observations.length === 1 ? "" : "s"
   }:\n\n${observations.map(buildResearchBrief).join("\n\n---\n\n")}`;
+  return {
+    model: MODEL,
+    // ~250 tokens per restaurant on the newer tokenizer, plus headroom.
+    max_tokens: 512 + observations.length * 450,
+    system: SYSTEM,
+    messages: [{ role: "user", content }],
+  };
+}
 
+async function assess(observations) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -356,18 +370,7 @@ async function assess(observations) {
       "x-api-key": process.env.ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify({
-      model: MODEL,
-      // ~250 tokens per restaurant on the newer tokenizer, plus headroom.
-      max_tokens: 512 + observations.length * 450,
-      system: SYSTEM,
-      messages: [
-        { role: "user", content },
-        // Prefilling the reply with "{" removes the whole class of failures
-        // where the answer is fine but wrapped in a sentence or a code fence.
-        { role: "assistant", content: "{" },
-      ],
-    }),
+    body: JSON.stringify(buildAssessRequest(observations)),
   });
 
   if (!response.ok) {
@@ -382,8 +385,9 @@ async function assess(observations) {
 }
 
 // Reads the model's answer defensively: every text block (not just the first,
-// which isn't guaranteed to be the text one), and both with and without the
-// prefilled brace, since a model may or may not treat it as already written.
+// which isn't guaranteed to be the text one), and — since the answer may arrive
+// wrapped in a sentence, a code fence, or missing its opening brace — both as
+// given and with a brace prepended.
 export function readModelJSON(data) {
   const raw = (Array.isArray(data?.content) ? data.content : [])
     .filter((c) => c?.type === "text" && typeof c.text === "string")
@@ -391,7 +395,7 @@ export function readModelJSON(data) {
     .join("\n")
     .trim();
   // An empty answer must stay empty: the JSON repair pass would otherwise turn
-  // a bare prefilled brace into {}, which reads as a successful parse.
+  // a bare brace into {}, which reads as a successful parse.
   if (!raw) return { parsed: null, raw: "" };
   const usable = (v) =>
     !!v && typeof v === "object" && Object.keys(v).length > 0;

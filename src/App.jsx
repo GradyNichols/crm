@@ -25,6 +25,7 @@ import Map from "./pages/MapPage";
 import LeadSpree from "./pages/LeadSpree";
 import { useNotifications, requestPermission } from "./hooks/useNotifications";
 import useTabStacks from "./hooks/useTabStacks";
+import { todayISO } from "./dates";
 import Progress from "./pages/Progress";
 import CallPrep from "./pages/CallPrep";
 import Today from "./pages/Today";
@@ -352,7 +353,7 @@ function Sidebar({ open, onClose }) {
   const refSections = useCRMStore((s) => s.refSections) ?? [];
   const activeRun = useCRMStore((s) => s.activeRun);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const dueToday = leads.filter(
     (l) =>
       !["Closed", "Dead"].includes(l.status) &&
@@ -641,7 +642,7 @@ function exportCSV(leads, customColumns) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `crm-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `crm-leads-${todayISO()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -866,13 +867,23 @@ export default function App() {
   const { activeTab, tabTo } = useTabStacks();
 
   // ── Daily Plan rollover ───────────────────────────────────────────────────────
-  // Runs once per app load, from whichever page opens first. Previously this
+  // Runs on every app load, from whichever page opens first. Previously this
   // lived only in DailyPlan, which meant the rollover depended on visiting that
   // page — and `lastPlanDate` could never leave null anyway, so it never fired.
+  // Re-checked whenever the app returns to the foreground, so an installed PWA
+  // left open overnight still rolls over in the morning.
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const { lastPlanDate, clearDailyPlan } = useCRMStore.getState();
-    if (lastPlanDate && lastPlanDate < today) clearDailyPlan(today);
+    const rollover = () => {
+      const today = todayISO();
+      const { lastPlanDate, clearDailyPlan } = useCRMStore.getState();
+      if (lastPlanDate && lastPlanDate < today) clearDailyPlan(today);
+    };
+    rollover();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") rollover();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const handleEdit = (lead) => {

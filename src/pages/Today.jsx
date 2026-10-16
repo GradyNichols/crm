@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
+import { todayISO } from "../dates";
 import {
   STATUS_COLORS,
   OUTREACH_TYPES,
@@ -16,7 +17,7 @@ import useGeneratePitch, { needsPitch } from "../hooks/useGeneratePitch";
 // cost a decision every morning for nothing. They're now two sections of one
 // page: Due is the source, Today's plan is the queue, and a run executes it.
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => todayISO();
 
 // ── Icons ───────────────────────────────────────────────────────────────────────
 const BackIcon = () => (

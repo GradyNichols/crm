@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import useCRMStore from "../store/useCRMStore";
 import { isAging, daysSinceTouch } from "../constants";
+import { todayISO } from "../dates";
 
 const STORAGE_KEY = "trace_notifications_last_sent";
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_NAMES_SHOWN = 3;
 
 function getLastSent() {
@@ -18,10 +18,12 @@ function setLastSent(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-function canFire(key, lastSent) {
-  const last = lastSent[key];
-  if (!last) return true;
-  return Date.now() - last > ONE_DAY_MS;
+// Once per calendar day, not once per rolling 24 hours — otherwise opening the
+// app at 9 AM one day and 8 AM the next skips the second digest. The stored
+// value is the day it last fired; an older install's timestamp never matches,
+// so it fires once and then switches over.
+function canFire(key, lastSent, today) {
+  return lastSent[key] !== today;
 }
 
 function fire(title, body, tag) {
@@ -63,9 +65,8 @@ export function useNotifications() {
     if (!("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
     if (!settings.enabled) return;
-    if (!canFire("daily_digest", getLastSent())) return;
-
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
+    if (!canFire("daily_digest", getLastSent(), today)) return;
 
     // ── Gather each category, respecting individual toggles ──────────────────
     const overdue =
@@ -116,6 +117,6 @@ export function useNotifications() {
     fire(title, bodyLines.join("\n"), "daily_digest");
 
     const lastSent = getLastSent();
-    setLastSent({ ...lastSent, daily_digest: Date.now() });
+    setLastSent({ ...lastSent, daily_digest: today });
   }, [leads, settings]);
 }

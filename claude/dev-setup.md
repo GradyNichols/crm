@@ -78,7 +78,7 @@ npm run lint       # oxlint; compare the counts with the baseline below
 **A good build** ends with `✓ built in …`. The `Some chunks are larger than
 500 kB` warning is expected (TRACE.md §10.9) and isn't a failure.
 
-**Lint baseline (October 2026): 0 errors, 54 warnings.** Errors fail the
+**Lint baseline (October 2026): 0 errors, 53 warnings.** Errors fail the
 slice. Warnings: report the count, and any new one in a touched file is the
 slice's to explain or fix. Don't clean up pre-existing warnings in passing —
 note them instead.

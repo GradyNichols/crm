@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { todayISO, addDaysISO } from "../dates";
 
 // ── Finish a stop ───────────────────────────────────────────────────────────────
 // Extracted from Pitch Mode so Call Prep can close a run stop the same way.
@@ -17,9 +18,7 @@ export const INTEREST_OPTIONS = [
 export function suggestFollowUp(key) {
   const days = FOLLOWUP_DAYS[key];
   if (!days) return "";
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return addDaysISO(todayISO(), days);
 }
 
 const COPY = {

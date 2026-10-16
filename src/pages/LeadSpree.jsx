@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import useCRMStore from "../store/useCRMStore";
-import { STATUSES, OUTREACH_TYPES } from "../constants";
+import {
+  STATUSES,
+  OUTREACH_TYPES,
+  suggestFollowUpForStatus as suggestFollowUp,
+} from "../constants";
 
 const FIXED_STEPS = [
   {
@@ -86,16 +90,6 @@ const EMPTY_FIXED = {
   followUpDate: "",
   notes: "",
 };
-
-const FOLLOWUP_DAYS = { Warm: 3, Contacted: 7, Waiting: 5, Cold: 14 };
-
-function suggestFollowUp(status) {
-  const days = FOLLOWUP_DAYS[status];
-  if (!days) return "";
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 // Map custom column type → spree step type
 function colTypeToStepType(colType) {

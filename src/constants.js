@@ -1,4 +1,4 @@
-import { todayISO, diffDaysISO } from "./dates";
+import { todayISO, diffDaysISO, addDaysISO } from "./dates";
 
 export const STATUSES = [
   "Cold",
@@ -51,6 +51,22 @@ export const AGING_THRESHOLDS = {
   Contacted: 7,
   Cold: 14,
 };
+
+// ── Follow-up auto-suggest ──────────────────────────────────────────────────────
+// Days until the next follow-up when a lead moves into a status (TRACE.md §6).
+// Dead/Closed have none: those clear the date.
+export const STATUS_FOLLOWUP_DAYS = {
+  Warm: 3,
+  Waiting: 5,
+  Contacted: 7,
+  Cold: 14,
+};
+
+// The suggested follow-up date for a status, or "" when it has none.
+export function suggestFollowUpForStatus(status) {
+  const days = STATUS_FOLLOWUP_DAYS[status];
+  return days ? addDaysISO(todayISO(), days) : "";
+}
 
 // Returns the number of days since lastTouchDate, or null if never touched.
 export function daysSinceTouch(lead) {

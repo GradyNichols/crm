@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { STATUSES, OUTREACH_TYPES } from "../constants";
+import {
+  STATUSES,
+  OUTREACH_TYPES,
+  suggestFollowUpForStatus,
+} from "../constants";
 import useCRMStore from "../store/useCRMStore";
 
 const EMPTY_FORM = {
@@ -53,13 +57,6 @@ export default function LeadModal({ onClose, onSave, existing }) {
     return () => window.removeEventListener("keydown", handler);
   }, [dirty]);
 
-  const FOLLOWUP_DAYS = {
-    Warm: 3,
-    Contacted: 7,
-    Waiting: 5,
-    Cold: 14,
-  };
-
   const set = (key, val) => {
     setForm((f) => ({ ...f, [key]: val }));
     setErrors((e) => ({ ...e, [key]: undefined }));
@@ -77,14 +74,11 @@ export default function LeadModal({ onClose, onSave, existing }) {
     const updates = { status };
     if (status === "Dead" || status === "Closed") {
       updates.followUpDate = "";
-    } else if (FOLLOWUP_DAYS[status]) {
-      const days = FOLLOWUP_DAYS[status];
-      const suggested = new Date();
-      suggested.setDate(suggested.getDate() + days);
-      const suggestedStr = suggested.toISOString().slice(0, 10);
+    } else {
+      const suggestedStr = suggestFollowUpForStatus(status);
       // Only auto-fill if empty or suggested date is sooner
       const current = form.followUpDate;
-      if (!current || suggestedStr < current) {
+      if (suggestedStr && (!current || suggestedStr < current)) {
         updates.followUpDate = suggestedStr;
       }
     }

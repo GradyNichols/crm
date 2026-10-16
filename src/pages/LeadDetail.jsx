@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
+import { todayISO } from "../dates";
 import {
   STATUS_COLORS,
   OUTREACH_TYPES,
@@ -587,7 +588,7 @@ export default function LeadDetail() {
             label="Follow-up"
             value={
               lead.followUpDate
-                ? lead.followUpDate < new Date().toISOString().slice(0, 10)
+                ? lead.followUpDate < todayISO()
                   ? `${lead.followUpDate} — overdue`
                   : lead.followUpDate
                 : null

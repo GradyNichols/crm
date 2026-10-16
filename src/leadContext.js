@@ -1,4 +1,5 @@
 import { daysSinceTouch, leadFindings } from "./constants";
+import { todayISO } from "./dates";
 
 // ── Lead → API payload ──────────────────────────────────────────────────────────
 // Shared by useGeneratePitch and useGenerateEmail. Both generators need the same
@@ -142,7 +143,7 @@ export function buildEmailPayload(
   return {
     ...base,
     senderName: senderName || "",
-    today: new Date().toISOString().slice(0, 10),
+    today: todayISO(),
     groupName: group?.name || "",
     customFields: customFieldsFor(lead, customColumns),
     // The angle the in-person pitch already takes, so the email argues the same

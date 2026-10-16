@@ -9,6 +9,7 @@ import {
 } from "../constants";
 import { ICONS } from "../icons";
 import useCRMStore from "../store/useCRMStore";
+import { todayISO } from "../dates";
 import EmptyState from "./EmptyState";
 
 function StarRating({ value }) {
@@ -1121,5 +1122,5 @@ export default function LeadTable({
 
 function isOverdue(dateStr) {
   if (!dateStr) return false;
-  return dateStr < new Date().toISOString().slice(0, 10);
+  return dateStr < todayISO();
 }

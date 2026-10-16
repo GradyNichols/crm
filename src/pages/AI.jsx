@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
+import { todayISO, diffDaysISO } from "../dates";
 import QueueButton, { QueueAllButton } from "../components/QueueButton";
 import useGeneratePitch from "../hooks/useGeneratePitch";
 
 function formatPipeline(leads) {
   if (!leads.length) return "No leads in pipeline.";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   return leads
     .map((l) => {
@@ -14,7 +15,7 @@ function formatPipeline(leads) {
         ? [...l.notesLog].reverse()[0].text
         : "No notes";
       const daysSinceTouch = l.lastTouchDate
-        ? Math.floor((new Date(today) - new Date(l.lastTouchDate)) / 86400000)
+        ? diffDaysISO(today, l.lastTouchDate)
         : null;
       const followUpOverdue =
         l.followUpDate && l.followUpDate < today

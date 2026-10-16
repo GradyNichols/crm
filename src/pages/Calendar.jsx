@@ -1,17 +1,18 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
+import { todayISO, isoFromLocalDate } from "../dates";
 import { STATUS_COLORS } from "../constants";
 import QueueButton, { QueueAllButton } from "../components/QueueButton";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function toKey(date) {
-  return date.toISOString().slice(0, 10);
+  return isoFromLocalDate(date);
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return todayISO();
 }
 
 // ── Hover preview ───────────────────────────────────────────────────────────────

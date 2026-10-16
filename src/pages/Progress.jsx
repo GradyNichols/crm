@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import useCRMStore from "../store/useCRMStore";
 import { STATUS_COLORS } from "../constants";
+import { todayISO, addDaysISO, diffDaysISO } from "../dates";
 
 // ── Palette ─────────────────────────────────────────────────────────────────────
 const STATUS_HEX = {
@@ -132,14 +133,13 @@ export default function Progress() {
 
     // Leads added per week (last 8 weeks)
     const now = new Date();
+    const today = todayISO();
     const weekData = [];
     for (let w = 7; w >= 0; w--) {
       const weekStart = new Date(now);
       weekStart.setDate(now.getDate() - w * 7);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 7);
-      const startStr = weekStart.toISOString().slice(0, 10);
-      const endStr = weekEnd.toISOString().slice(0, 10);
+      const startStr = addDaysISO(today, -w * 7);
+      const endStr = addDaysISO(startStr, 7);
       const count = leads.filter((l) => {
         const d = l.notesLog?.[0]?.ts || "";
         return d >= startStr && d < endStr;
@@ -173,9 +173,8 @@ export default function Progress() {
       closedLeads.length > 0
         ? Math.round(
             closedLeads.reduce((s, l) => {
-              const start = new Date(l.notesLog[0].ts);
-              const end = new Date(l.lastTouchDate);
-              return s + Math.max(0, (end - start) / 86400000);
+              const days = diffDaysISO(l.lastTouchDate, l.notesLog[0].ts);
+              return s + Math.max(0, days || 0);
             }, 0) / closedLeads.length,
           )
         : null;

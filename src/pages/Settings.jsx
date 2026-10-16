@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useCRMStore from "../store/useCRMStore";
 import { requestPermission } from "../hooks/useNotifications";
+import { todayISO } from "../dates";
 
 const FIELD_TYPES = [
   { value: "text", label: "Text", desc: "Free-form text entry" },
@@ -179,7 +180,7 @@ function exportBackup(state) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `trace-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `trace-backup-${todayISO()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

@@ -6,11 +6,12 @@ import {
   isValid,
 } from "date-fns";
 import { STATUS_COLORS, isAging, daysSinceTouch } from "../constants";
+import { todayISO } from "../dates";
 
 export default function SummaryBar({ leads, statusFilter, onStatusClick }) {
   const today = startOfToday();
   const weekEnd = addDays(today, 7);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayISO();
 
   const statusCounts = leads.reduce((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;

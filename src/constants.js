@@ -1,3 +1,5 @@
+import { todayISO, diffDaysISO } from "./dates";
+
 export const STATUSES = [
   "Cold",
   "Contacted",
@@ -53,11 +55,7 @@ export const AGING_THRESHOLDS = {
 // Returns the number of days since lastTouchDate, or null if never touched.
 export function daysSinceTouch(lead) {
   if (!lead.lastTouchDate) return null;
-  const today = new Date().toISOString().slice(0, 10);
-  const diff = Math.floor(
-    (new Date(today) - new Date(lead.lastTouchDate)) / 86400000,
-  );
-  return diff;
+  return diffDaysISO(todayISO(), lead.lastTouchDate);
 }
 
 // Returns true if a lead is "aging" — sitting in its current status too long without contact.

@@ -7,6 +7,7 @@ import {
   dismissedTombstone,
   pruneProspects,
 } from "../prospects";
+import { todayISO } from "../dates";
 
 const migrateNotes = (lead) => {
   if (Array.isArray(lead.notesLog)) return lead;
@@ -15,7 +16,7 @@ const migrateNotes = (lead) => {
         {
           id: `n_${Date.now()}_${Math.random()}`,
           text: lead.notes,
-          ts: lead.lastTouchDate || new Date().toISOString().slice(0, 10),
+          ts: lead.lastTouchDate || todayISO(),
         },
       ]
     : [];
@@ -25,8 +26,6 @@ const migrateNotes = (lead) => {
 
 const id = (prefix = "id") =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
 
 // Emails are signed by the app, not by the model, so the name has to live
 // somewhere editable. Seeded rather than empty: this key arrives after v1.0, and
@@ -69,7 +68,7 @@ const useCRMStore = create(
               {
                 id: id("n"),
                 text: lead.notes,
-                ts: new Date().toISOString().slice(0, 10),
+                ts: todayISO(),
               },
             ]
           : [];
@@ -80,7 +79,7 @@ const useCRMStore = create(
       },
 
       addLeadsBulk: (newLeads) => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayISO();
         const prepared = newLeads.map((lead) => {
           const notesLog = lead.notes
             ? [{ id: id("n"), text: lead.notes, ts: today }]
@@ -104,7 +103,7 @@ const useCRMStore = create(
                     {
                       id: id("n"),
                       text: notes.trim(),
-                      ts: new Date().toISOString().slice(0, 10),
+                      ts: todayISO(),
                     },
                   ]
                 : existing;
@@ -225,7 +224,7 @@ const useCRMStore = create(
       },
 
       logTouchpoint: (leadId, { type, note }) => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayISO();
         set((s) => ({
           leads: s.leads.map((l) => {
             if (l.id !== leadId) return l;
@@ -624,7 +623,7 @@ const useCRMStore = create(
       // Seeded to today at store creation. Previously this started as null and the
       // only writer (clearDailyPlan) was gated on it already being non-null, so the
       // midnight rollover could never fire.
-      lastPlanDate: todayStr(),
+      lastPlanDate: todayISO(),
       lastPlanSummary: [],
 
       addToPlan: (leadId) => {
@@ -866,7 +865,7 @@ const useCRMStore = create(
             stale: true,
           },
           dailyPlan: [],
-          lastPlanDate: todayStr(),
+          lastPlanDate: todayISO(),
           lastPlanSummary: [],
           homeBase: null,
           pageSpeedCache: {},
@@ -918,7 +917,7 @@ const useCRMStore = create(
           stale: true,
         },
         dailyPlan: persisted.dailyPlan || [],
-        lastPlanDate: persisted.lastPlanDate || todayStr(),
+        lastPlanDate: persisted.lastPlanDate || todayISO(),
         lastPlanSummary: persisted.lastPlanSummary || [],
         homeBase: persisted.homeBase || null,
         pageSpeedCache: persisted.pageSpeedCache || {},
